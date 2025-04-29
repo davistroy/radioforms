@@ -8,11 +8,14 @@ of the application.
 
 import sys
 import os
+from pathlib import Path
 from PySide6.QtCore import QObject, Signal, Slot
 
 from radioforms.views.main_window import MainWindow
+from radioforms.views.startup_wizard import StartupWizard
 from radioforms.database.db_manager import DatabaseManager
 from radioforms.config.app_config import AppConfig
+from radioforms.config.config_manager import ConfigManager, SystemIntegrityChecker
 from radioforms.controllers.forms_controller import FormsController
 
 
@@ -28,6 +31,7 @@ class AppController(QObject):
         self.config = AppConfig()
         self.db_manager = None
         self.main_window = None
+        self.config_manager = None
         
         # Initialize sub-controllers
         self.forms_controller = FormsController(self)
@@ -36,6 +40,13 @@ class AppController(QObject):
         """Start the application."""
         # Initialize database connection
         self.init_database()
+        
+        # Initialize configuration manager
+        self.init_config()
+        
+        # Check if this is the first run and show startup wizard if needed
+        if self.check_first_run():
+            self.show_startup_wizard()
         
         # Create and show the main window
         self.init_ui()
@@ -49,6 +60,11 @@ class AppController(QObject):
             # In a real application, this would use the error handling system
             print(f"Database initialization error: {e}")
             sys.exit(1)
+    
+    def init_config(self):
+        """Initialize the configuration manager."""
+        if self.db_manager:
+            self.config_manager = ConfigManager(self.db_manager)
             
     def init_ui(self):
         """Initialize and display the user interface."""
@@ -58,6 +74,28 @@ class AppController(QObject):
         # Connect signals from forms controller to UI
         self._connect_form_signals()
         
+    def check_first_run(self):
+        """
+        Check if this is the first run of the application.
+        
+        Returns:
+            True if this is the first run, False otherwise
+        """
+        if not self.config_manager:
+            return True
+        
+        return self.config_manager.is_first_run()
+    
+    def show_startup_wizard(self):
+        """Show the startup wizard."""
+        app_directory = Path(self.config.get('application', 'data_dir'))
+        wizard = StartupWizard(self.db_manager, app_directory)
+        result = wizard.exec()
+        
+        # If the user cancels the wizard, exit the application
+        if result == 0:
+            sys.exit(0)
+    
     def _connect_form_signals(self):
         """Connect signals from the forms controller to UI handlers."""
         # These will be implemented as the UI is developed

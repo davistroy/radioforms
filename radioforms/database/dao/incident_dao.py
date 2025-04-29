@@ -2,205 +2,176 @@
 # -*- coding: utf-8 -*-
 
 """
-Incident Data Access Object (DAO) for database operations related to incidents.
+Data Access Object for incident operations.
+
+This module provides a DAO for interacting with incident data in the database.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
-import datetime
+from datetime import datetime
+from typing import Dict, Any, List, Optional, Tuple
 
-from radioforms.database.dao.base_dao import BaseDAO, DAOException
-from radioforms.database.models.incident import Incident
+from radioforms.database.dao.base_dao import BaseDAO
 from radioforms.database.db_manager import DatabaseManager
 
 
-class IncidentDAO(BaseDAO[Incident]):
+class IncidentDAO(BaseDAO):
     """
-    Data Access Object for Incident entities, providing database operations
-    for creating, retrieving, updating, and deleting incidents.
+    Data Access Object for incident operations.
+    
+    This class provides methods to create, read, update, and delete
+    incident records in the database.
     """
     
     def __init__(self, db_manager: DatabaseManager):
         """
-        Initialize the IncidentDAO with a database manager.
+        Initialize the incident DAO.
         
         Args:
-            db_manager: Database manager for database operations
+            db_manager: Database manager instance
         """
         super().__init__(db_manager)
-        self.table_name = "incidents"
-        self.pk_column = "id"
-        
-    def _row_to_entity(self, row: Dict[str, Any]) -> Incident:
+        self.table_name = 'incidents'
+    
+    def create(self, incident_data: Dict[str, Any]) -> Optional[int]:
         """
-        Convert a database row to an Incident entity.
-        
-        Args:
-            row: Dictionary containing column names and values
-            
-        Returns:
-            An Incident entity
-        """
-        return Incident(
-            id=row.get('id'),
-            name=row.get('name', ''),
-            description=row.get('description'),
-            start_date=row.get('start_date'),
-            end_date=row.get('end_date'),
-            created_at=row.get('created_at'),
-            updated_at=row.get('updated_at')
-        )
-        
-    def _entity_to_values(self, entity: Incident) -> Dict[str, Any]:
-        """
-        Convert an Incident entity to a dictionary of column values.
+        Create a new incident record.
         
         Args:
-            entity: The Incident entity
+            incident_data: Incident data dictionary
             
         Returns:
-            Dictionary containing column names and values
+            Incident ID if successful, None otherwise
         """
-        values = {
-            'name': entity.name,
-            'description': entity.description,
-            'start_date': entity.start_date,
-            'end_date': entity.end_date,
-            'created_at': entity.created_at,
-            'updated_at': entity.updated_at
+        # Add timestamps if not present
+        if 'created_at' not in incident_data:
+            incident_data['created_at'] = datetime.now()
+        if 'updated_at' not in incident_data:
+            incident_data['updated_at'] = datetime.now()
+        
+        # Set start_date to now if not provided
+        if 'start_date' not in incident_data or incident_data['start_date'] is None:
+            incident_data['start_date'] = datetime.now()
+        
+        return super().create(incident_data)
+    
+    def update(self, incident_id: int, incident_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Update an existing incident record.
+        
+        Args:
+            incident_id: Incident ID to update
+            incident_data: Updated incident data dictionary
+            
+        Returns:
+            Updated incident dictionary if successful, None otherwise
+        """
+        # Add updated timestamp if not present
+        if 'updated_at' not in incident_data:
+            incident_data['updated_at'] = datetime.now()
+            
+        return super().update(incident_id, incident_data)
+    
+    def get_by_id(self, incident_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Get an incident record by ID.
+        
+        Args:
+            incident_id: Incident ID to retrieve
+            
+        Returns:
+            Incident dictionary if found, None otherwise
+        """
+        return super().get_by_id(incident_id)
+    
+    def get_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        """
+        Get an incident record by name.
+        
+        Args:
+            name: Incident name to search for
+            
+        Returns:
+            Incident dictionary if found, None otherwise
+        """
+        query = "SELECT * FROM incidents WHERE name = ? LIMIT 1"
+        cursor = self.db_manager.execute(query, (name,))
+        result = cursor.fetchone()
+        
+        return dict(result) if result else None
+    
+    def get_all(self) -> List[Dict[str, Any]]:
+        """
+        Get all incident records.
+        
+        Returns:
+            List of incident dictionaries
+        """
+        query = "SELECT * FROM incidents ORDER BY created_at DESC"
+        cursor = self.db_manager.execute(query)
+        results = cursor.fetchall()
+        
+        return [dict(row) for row in results]
+    
+    def get_active(self) -> List[Dict[str, Any]]:
+        """
+        Get all active incidents (no end_date).
+        
+        Returns:
+            List of active incident dictionaries
+        """
+        query = "SELECT * FROM incidents WHERE end_date IS NULL ORDER BY created_at DESC"
+        cursor = self.db_manager.execute(query)
+        results = cursor.fetchall()
+        
+        return [dict(row) for row in results]
+    
+    def delete(self, incident_id: int) -> bool:
+        """
+        Delete an incident record.
+        
+        Args:
+            incident_id: Incident ID to delete
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        return super().delete(incident_id)
+    
+    def close_incident(self, incident_id: int) -> bool:
+        """
+        Close an incident by setting its end_date.
+        
+        Args:
+            incident_id: Incident ID to close
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        update_data = {
+            'end_date': datetime.now(),
+            'updated_at': datetime.now()
         }
         
-        if entity.id is not None:
-            values['id'] = entity.id
-            
-        return values
-        
-    def find_by_name(self, name: str) -> List[Incident]:
+        result = self.update(incident_id, update_data)
+        return result is not None
+    
+    def get_forms_for_incident(self, incident_id: int) -> List[Dict[str, Any]]:
         """
-        Find incidents by name (case-insensitive partial match).
+        Get all forms associated with an incident.
         
         Args:
-            name: Name or part of name to search for
+            incident_id: Incident ID to get forms for
             
         Returns:
-            List of matching incidents
+            List of form dictionaries
         """
-        query = f"SELECT * FROM {self.table_name} WHERE name LIKE ?"
-        cursor = self.db_manager.execute(query, (f"%{name}%",))
-        
-        return [self._row_to_entity(dict(row)) for row in cursor.fetchall()]
-        
-    def find_active_incidents(self, order_by: str = "start_date DESC") -> List[Incident]:
+        query = """
+        SELECT f.* FROM forms f
+        WHERE f.incident_id = ?
+        ORDER BY f.created_at DESC
         """
-        Find all active incidents (no end date).
         
-        Args:
-            order_by: Column to order by with optional direction
-            
-        Returns:
-            List of active incidents
-        """
-        query = f"SELECT * FROM {self.table_name} WHERE end_date IS NULL ORDER BY {order_by}"
-        cursor = self.db_manager.execute(query)
+        cursor = self.db_manager.execute(query, (incident_id,))
+        results = cursor.fetchall()
         
-        return [self._row_to_entity(dict(row)) for row in cursor.fetchall()]
-        
-    def find_closed_incidents(self, order_by: str = "end_date DESC") -> List[Incident]:
-        """
-        Find all closed incidents (with end date).
-        
-        Args:
-            order_by: Column to order by with optional direction
-            
-        Returns:
-            List of closed incidents
-        """
-        query = f"SELECT * FROM {self.table_name} WHERE end_date IS NOT NULL ORDER BY {order_by}"
-        cursor = self.db_manager.execute(query)
-        
-        return [self._row_to_entity(dict(row)) for row in cursor.fetchall()]
-        
-    def find_in_date_range(self, start_date: datetime.datetime, 
-                         end_date: datetime.datetime) -> List[Incident]:
-        """
-        Find incidents that overlap with the specified date range.
-        
-        Args:
-            start_date: Start of the date range
-            end_date: End of the date range
-            
-        Returns:
-            List of incidents in the date range
-        """
-        query = f"""
-            SELECT * FROM {self.table_name} 
-            WHERE 
-                (start_date <= ? AND (end_date IS NULL OR end_date >= ?))
-            ORDER BY start_date DESC
-        """
-        cursor = self.db_manager.execute(query, (end_date, start_date))
-        
-        return [self._row_to_entity(dict(row)) for row in cursor.fetchall()]
-        
-    def close_incident(self, incident_id: int, end_date: Optional[datetime.datetime] = None) -> bool:
-        """
-        Close an incident by setting its end date.
-        
-        Args:
-            incident_id: ID of the incident to close
-            end_date: End date to set (defaults to current time)
-            
-        Returns:
-            True if the incident was closed, False otherwise
-        """
-        now = datetime.datetime.now()
-        end_date = end_date or now
-        
-        query = f"UPDATE {self.table_name} SET end_date = ?, updated_at = ? WHERE id = ?"
-        cursor = self.db_manager.execute(query, (end_date, now, incident_id))
-        self.db_manager.commit()
-        
-        return cursor.rowcount > 0
-        
-    def reopen_incident(self, incident_id: int) -> bool:
-        """
-        Reopen a closed incident by clearing its end date.
-        
-        Args:
-            incident_id: ID of the incident to reopen
-            
-        Returns:
-            True if the incident was reopened, False otherwise
-        """
-        now = datetime.datetime.now()
-        
-        query = f"UPDATE {self.table_name} SET end_date = NULL, updated_at = ? WHERE id = ?"
-        cursor = self.db_manager.execute(query, (now, incident_id))
-        self.db_manager.commit()
-        
-        return cursor.rowcount > 0
-        
-    def get_incident_stats(self) -> Dict[str, int]:
-        """
-        Get statistics about incidents.
-        
-        Returns:
-            Dictionary with stats (total, active, closed)
-        """
-        stats = {}
-        
-        # Get total count
-        query = f"SELECT COUNT(*) FROM {self.table_name}"
-        cursor = self.db_manager.execute(query)
-        stats['total'] = cursor.fetchone()[0]
-        
-        # Get active count
-        query = f"SELECT COUNT(*) FROM {self.table_name} WHERE end_date IS NULL"
-        cursor = self.db_manager.execute(query)
-        stats['active'] = cursor.fetchone()[0]
-        
-        # Get closed count
-        query = f"SELECT COUNT(*) FROM {self.table_name} WHERE end_date IS NOT NULL"
-        cursor = self.db_manager.execute(query)
-        stats['closed'] = cursor.fetchone()[0]
-        
-        return stats
+        return [dict(row) for row in results]
