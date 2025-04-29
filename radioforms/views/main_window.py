@@ -8,10 +8,82 @@ Main application window implementation.
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QLabel, QPushButton, QStatusBar, QToolBar, QMenuBar,
-    QMenu, QTabWidget, QSplitter
+    QMenu, QDialog, QListWidget, QListWidgetItem, 
+    QFileDialog, QMessageBox, QSplitter
 )
 from PySide6.QtCore import Qt, Slot, Signal
 from PySide6.QtGui import QAction, QIcon, QFont
+
+from radioforms.views.form_tab_widget import FormTabWidget
+
+
+class FormSelectionDialog(QDialog):
+    """Dialog for selecting a form type to create."""
+    
+    def __init__(self, form_types, parent=None):
+        """
+        Initialize the form selection dialog.
+        
+        Args:
+            form_types: List of (form_type, display_name) tuples
+            parent: Parent widget
+        """
+        super().__init__(parent)
+        
+        self.form_types = form_types
+        self.selected_type = None
+        
+        self.setWindowTitle("Select Form Type")
+        self.resize(400, 300)
+        
+        # Create layout
+        layout = QVBoxLayout(self)
+        
+        # Create list widget
+        self.list_widget = QListWidget()
+        layout.addWidget(self.list_widget)
+        
+        # Add form types to list
+        for form_type, display_name in form_types:
+            item = QListWidgetItem(f"{display_name} ({form_type})")
+            item.setData(Qt.UserRole, form_type)
+            self.list_widget.addItem(item)
+            
+        # Connect double click to accept
+        self.list_widget.itemDoubleClicked.connect(self.accept)
+        
+        # Create button layout
+        button_layout = QHBoxLayout()
+        
+        self.cancel_button = QPushButton("Cancel")
+        self.ok_button = QPushButton("OK")
+        self.ok_button.setDefault(True)
+        
+        button_layout.addStretch()
+        button_layout.addWidget(self.cancel_button)
+        button_layout.addWidget(self.ok_button)
+        
+        layout.addLayout(button_layout)
+        
+        # Connect buttons
+        self.cancel_button.clicked.connect(self.reject)
+        self.ok_button.clicked.connect(self.accept)
+        
+    def accept(self):
+        """Handle dialog acceptance."""
+        selected_items = self.list_widget.selectedItems()
+        if selected_items:
+            self.selected_type = selected_items[0].data(Qt.UserRole)
+        super().accept()
+        
+    def get_selected_type(self):
+        """
+        Get the selected form type.
+        
+        Returns:
+            Selected form type, or None if no selection
+        """
+        return self.selected_type
 
 
 class MainWindow(QMainWindow):
@@ -106,6 +178,17 @@ class MainWindow(QMainWindow):
         self.preferences_action = QAction("&Preferences", self)
         self.edit_menu.addAction(self.preferences_action)
         
+        # Forms menu
+        self.forms_menu = self.menu_bar.addMenu("&Forms")
+        
+        # Create ICS-213 form action
+        self.new_ics213_action = QAction("New ICS-213 General Message", self)
+        self.forms_menu.addAction(self.new_ics213_action)
+        
+        # Create ICS-214 form action
+        self.new_ics214_action = QAction("New ICS-214 Activity Log", self)
+        self.forms_menu.addAction(self.new_ics214_action)
+        
         # View menu
         self.view_menu = self.menu_bar.addMenu("&View")
         
@@ -141,16 +224,15 @@ class MainWindow(QMainWindow):
         # Main layout
         self.main_layout = QVBoxLayout(self.central_widget)
         
-        # Create a tab widget for forms
-        self.tab_widget = QTabWidget()
-        self.tab_widget.setTabsClosable(True)
+        # Create a form tab widget
+        self.form_tab_widget = FormTabWidget(self.controller)
         
         # Create a welcome tab
         self.welcome_widget = self._create_welcome_widget()
-        self.tab_widget.addTab(self.welcome_widget, "Welcome")
+        self.form_tab_widget.addTab(self.welcome_widget, "Welcome")
         
         # Add the tab widget to the main layout
-        self.main_layout.addWidget(self.tab_widget)
+        self.main_layout.addWidget(self.form_tab_widget)
         
     def _create_welcome_widget(self):
         """Create the welcome widget shown on startup."""
@@ -178,12 +260,12 @@ class MainWindow(QMainWindow):
         # Add buttons for quick actions
         button_layout = QHBoxLayout()
         
-        new_form_button = QPushButton("Create New Form")
-        open_form_button = QPushButton("Open Existing Form")
+        self.new_form_button = QPushButton("Create New Form")
+        self.open_form_button = QPushButton("Open Existing Form")
         
         button_layout.addStretch()
-        button_layout.addWidget(new_form_button)
-        button_layout.addWidget(open_form_button)
+        button_layout.addWidget(self.new_form_button)
+        button_layout.addWidget(self.open_form_button)
         button_layout.addStretch()
         
         # Add everything to the layout
@@ -201,22 +283,126 @@ class MainWindow(QMainWindow):
     def _connect_signals(self):
         """Connect signals to slots."""
         # File menu
+        self.new_form_action.triggered.connect(self._on_new_form)
+        self.open_form_action.triggered.connect(self._on_open_form)
+        self.save_form_action.triggered.connect(self._on_save_form)
+        self.save_as_action.triggered.connect(self._on_save_form_as)
         self.exit_action.triggered.connect(self.close)
         
-        # Tab widget
-        self.tab_widget.tabCloseRequested.connect(self._on_tab_close_requested)
+        # Forms menu
+        self.new_ics213_action.triggered.connect(
+            lambda: self._create_specific_form("ICS-213")
+        )
+        self.new_ics214_action.triggered.connect(
+            lambda: self._create_specific_form("ICS-214")
+        )
         
-    @Slot(int)
-    def _on_tab_close_requested(self, index):
+        # Welcome widget buttons
+        self.new_form_button.clicked.connect(self._on_new_form)
+        self.open_form_button.clicked.connect(self._on_open_form)
+        
+    @Slot()
+    def _on_new_form(self):
+        """Handle creating a new form."""
+        # Get available form types
+        form_types = self.controller.get_available_form_types()
+        
+        if not form_types:
+            QMessageBox.warning(
+                self,
+                "No Form Types",
+                "No form types are available. Please check your installation."
+            )
+            return
+            
+        # Show form selection dialog
+        dialog = FormSelectionDialog(form_types, self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+            
+        # Get selected form type
+        form_type = dialog.get_selected_type()
+        if not form_type:
+            return
+            
+        # Create the form
+        self._create_specific_form(form_type)
+        
+    def _create_specific_form(self, form_type):
         """
-        Handle a request to close a tab.
+        Create a form of a specific type.
         
         Args:
-            index: Index of the tab to close
+            form_type: Type of form to create
         """
-        # Don't close the welcome tab (index 0)
-        if index > 0:
-            self.tab_widget.removeTab(index)
+        # Create the form
+        form = self.controller.create_form(form_type)
+        
+        if not form:
+            QMessageBox.warning(
+                self,
+                "Form Creation Failed",
+                f"Failed to create form of type {form_type}."
+            )
+            return
+            
+        # Add a tab for the form
+        self.form_tab_widget.add_form_tab(form)
+        
+    @Slot()
+    def _on_open_form(self):
+        """Handle opening an existing form."""
+        # Show file dialog
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open Form",
+            "",
+            "Form Files (*.json);;All Files (*)"
+        )
+        
+        if not file_path:
+            # User cancelled
+            return
+            
+        # Load the form
+        form = self.controller.load_form(file_path)
+        
+        if not form:
+            QMessageBox.warning(
+                self,
+                "Form Loading Failed",
+                f"Failed to load form from {file_path}."
+            )
+            return
+            
+        # Add a tab for the form
+        self.form_tab_widget.add_form_tab(form)
+        
+    @Slot()
+    def _on_save_form(self):
+        """Handle saving the current form."""
+        # Get the current tab index
+        index = self.form_tab_widget.currentIndex()
+        
+        # Skip if it's the welcome tab
+        if index == 0:
+            return
+            
+        # Save the tab
+        self.form_tab_widget._save_tab(index)
+        
+    @Slot()
+    def _on_save_form_as(self):
+        """Handle saving the current form with a new name."""
+        # Get the current tab index
+        index = self.form_tab_widget.currentIndex()
+        
+        # Skip if it's the welcome tab
+        if index == 0:
+            return
+            
+        # Save the tab as
+        self.form_tab_widget._save_tab_as(index)
             
     def closeEvent(self, event):
         """
@@ -225,8 +411,11 @@ class MainWindow(QMainWindow):
         Args:
             event: Close event
         """
+        # Check for unsaved changes in all tabs
+        # For simplicity, we'll just close all tabs, which will prompt for saving
+        self.form_tab_widget._close_all_tabs()
+        
         # Notify the controller that the application is closing
-        # In a real app, we would check for unsaved changes here
         if self.controller:
             self.controller.shutdown()
             

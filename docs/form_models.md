@@ -194,14 +194,20 @@ To add a new form type:
 
 ## Testing
 
-Comprehensive test coverage is provided in `radioforms/tests/test_form_models.py`, which verifies:
+Comprehensive test coverage is provided in the following test files:
 
+### Core Model Tests (`radioforms/tests/test_form_models.py`)
 - Form creation and property access
 - Serialization and deserialization
 - Validation rules
 - Form registry and factory functionality
 - Change tracking with undo/redo
 - Form manager persistence operations
+
+### UI Component Tests (`radioforms/tests/test_views/`)
+- Basic UI component initialization and properties (`test_form_views.py`)
+- Form tab management and controller interaction (`test_form_tab_widget.py`)
+- Signal connections between models and views
 
 ## Future Enhancements
 

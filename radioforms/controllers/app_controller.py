@@ -13,6 +13,7 @@ from PySide6.QtCore import QObject, Signal, Slot
 from radioforms.views.main_window import MainWindow
 from radioforms.database.db_manager import DatabaseManager
 from radioforms.config.app_config import AppConfig
+from radioforms.controllers.forms_controller import FormsController
 
 
 class AppController(QObject):
@@ -28,7 +29,8 @@ class AppController(QObject):
         self.db_manager = None
         self.main_window = None
         
-        # Initialize sub-controllers here as needed
+        # Initialize sub-controllers
+        self.forms_controller = FormsController(self)
         
     def start(self):
         """Start the application."""
@@ -53,10 +55,81 @@ class AppController(QObject):
         self.main_window = MainWindow(self)
         self.main_window.show()
         
+        # Connect signals from forms controller to UI
+        self._connect_form_signals()
+        
+    def _connect_form_signals(self):
+        """Connect signals from the forms controller to UI handlers."""
+        # These will be implemented as the UI is developed
+        # Example:
+        # self.forms_controller.form_created.connect(self.main_window.add_form_tab)
+        pass
+        
+    def create_form(self, form_type):
+        """
+        Create a new form.
+        
+        Args:
+            form_type: Type of form to create
+            
+        Returns:
+            The created form or None if creation failed
+        """
+        return self.forms_controller.create_form(form_type)
+        
+    def load_form(self, path):
+        """
+        Load a form from disk.
+        
+        Args:
+            path: Path to the form file
+            
+        Returns:
+            The loaded form or None if loading failed
+        """
+        return self.forms_controller.load_form(path)
+        
+    def save_form(self, form_id, path=None):
+        """
+        Save a form to disk.
+        
+        Args:
+            form_id: ID of the form to save
+            path: Path to save to, or None to use default
+            
+        Returns:
+            Path where the form was saved, or None if saving failed
+        """
+        return self.forms_controller.save_form(form_id, path)
+        
+    def close_form(self, form_id):
+        """
+        Close a form.
+        
+        Args:
+            form_id: ID of the form to close
+            
+        Returns:
+            True if the form was closed, False if not found
+        """
+        return self.forms_controller.close_form(form_id)
+        
+    def get_available_form_types(self):
+        """
+        Get a list of available form types.
+        
+        Returns:
+            List of (form_type, display_name) tuples
+        """
+        return self.forms_controller.get_available_form_types()
+        
     def shutdown(self):
         """Clean up resources and prepare for application shutdown."""
         # Close database connections
         if self.db_manager:
             self.db_manager.close()
             
+        # Save any unsaved forms or prompt user before closing
+        # This would be implemented as the application develops
+        
         # Perform any other necessary cleanup
