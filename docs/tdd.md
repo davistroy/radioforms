@@ -4485,6 +4485,130 @@ def test_database_corruption_recovery():
         assert form["form_name"] == "Test Form"
 ```
 
+### 11.6 User Journey Testing Example
+
+```python
+def test_complete_user_journey():
+    """Test a complete user journey through the application"""
+    import pytest
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QApplication, QMessageBox
+    from PySide6.QtTest import QTest
+    
+    # Create application instance
+    app = QApplication([])
+    
+    # Create main window
+    from src.ui.main_window import MainWindow
+    main_window = MainWindow()
+    main_window.show()
+    
+    # Wait for rendering
+    QApplication.processEvents()
+    
+    # Step 1: Create a new form
+    # Click the "New Form" button
+    new_form_button = main_window.findChild(QPushButton, "btn_new_form")
+    QTest.mouseClick(new_form_button, Qt.LeftButton)
+    
+    # Wait for dialog
+    QApplication.processEvents()
+    
+    # Select form type (ICS-213)
+    form_type_dialog = app.activeModalWidget()
+    form_list = form_type_dialog.findChild(QListWidget)
+    for i in range(form_list.count()):
+        if form_list.item(i).text() == "ICS-213 (General Message)":
+            form_list.setCurrentItem(form_list.item(i))
+            break
+    
+    # Click OK
+    ok_button = form_type_dialog.findChild(QPushButton, "btn_ok")
+    QTest.mouseClick(ok_button, Qt.LeftButton)
+    
+    # Wait for form to open
+    QApplication.processEvents()
+    
+    # Step 2: Fill out form fields
+    # Get form view
+    form_view = main_window.findChild(FormView)
+    
+    # Fill "To" field
+    to_field = form_view.findChild(QLineEdit, "field_to_name")
+    QTest.keyClicks(to_field, "John Doe")
+    
+    # Fill "From" field
+    from_field = form_view.findChild(QLineEdit, "field_from_name")
+    QTest.keyClicks(from_field, "Jane Smith")
+    
+    # Fill "Subject" field
+    subject_field = form_view.findChild(QLineEdit, "field_subject")
+    QTest.keyClicks(subject_field, "Test Message")
+    
+    # Fill "Message" field
+    message_field = form_view.findChild(QTextEdit, "field_message")
+    QTest.keyClicks(message_field, "This is a test message for user journey testing.")
+    
+    # Step 3: Save the form
+    # Click the "Save" button
+    save_button = form_view.findChild(QPushButton, "btn_save")
+    QTest.mouseClick(save_button, Qt.LeftButton)
+    
+    # Wait for save to complete
+    QApplication.processEvents()
+    
+    # Step 4: Export the form
+    # Click the "Export" button
+    export_button = form_view.findChild(QPushButton, "btn_export")
+    QTest.mouseClick(export_button, Qt.LeftButton)
+    
+    # Wait for export dialog
+    QApplication.processEvents()
+    
+    # Select PDF format
+    export_dialog = app.activeModalWidget()
+    format_combo = export_dialog.findChild(QComboBox, "combo_format")
+    format_combo.setCurrentText("PDF")
+    
+    # Set output path (use temp directory)
+    path_field = export_dialog.findChild(QLineEdit, "field_path")
+    temp_path = os.path.join(tempfile.gettempdir(), "test_export.pdf")
+    path_field.setText(temp_path)
+    
+    # Click Export
+    export_ok_button = export_dialog.findChild(QPushButton, "btn_export")
+    QTest.mouseClick(export_ok_button, Qt.LeftButton)
+    
+    # Wait for export to complete
+    QApplication.processEvents()
+    
+    # Step 5: Close the form
+    # Get the tab widget
+    tab_widget = main_window.findChild(QTabWidget)
+    close_button = tab_widget.tabBar().tabButton(0, QTabBar.RightSide)
+    QTest.mouseClick(close_button, Qt.LeftButton)
+    
+    # Wait for close
+    QApplication.processEvents()
+    
+    # Step 6: Navigate to form list
+    # Click on "Saved Forms" in sidebar
+    sidebar = main_window.findChild(Sidebar)
+    saved_forms_button = sidebar.findChild(QPushButton, "btn_saved_forms")
+    QTest.mouseClick(saved_forms_button, Qt.LeftButton)
+    
+    # Wait for form list to load
+    QApplication.processEvents()
+    
+    # Step 7: Verify exported file exists
+    assert os.path.exists(temp_path)
+    assert os.path.getsize(temp_path) > 0
+    
+    # Clean up
+    if os.path.exists(temp_path):
+        os.remove(temp_path)
+```
+
 ## 12. Detailed Design: Documentation System
 
 ### 12.1 Documentation Generator

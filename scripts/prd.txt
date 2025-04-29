@@ -1,0 +1,162 @@
+# ICS Forms Management Application
+Version: 1.1
+Date: April 29, 2025
+Status: Draft
+
+# Introduction
+The ICS Forms Management Application is a standalone, offline-first desktop application that enables users to create, manage, export, and archive FEMA Incident Command System (ICS) forms. It provides administrative staff and radio operators with a modern, user-friendly interface for managing ICS forms while supporting offline operation and multiple export formats.
+
+# Project Scope
+The application will be a standalone, single-file executable that stores form data in a SQLite database. It will allow users to create, manage, and export FEMA ICS forms in various formats. The application will run without an internet connection and will not require installation. It incorporates a plugin architecture for extensibility and a robust version tracking system that uses semantic versioning for the application and date-based versioning for forms.
+
+# Key Features
+
+## Application Startup and Configuration
+- Initial startup wizard to collect user name, call sign, and incident name
+- Subsequent startups pre-populate with previous session values
+- Store user's name and call sign as default form creator values
+- Display incident name prominently to indicate current database
+- Perform basic startup diagnostics for database, file system, and disk space
+- Check file integrity at startup using checksums
+
+## Form Creation and Management
+- Support for ICS-213 and ICS-214 forms in MVP, with all ICS forms (201-225) in full release
+- Pre-populate form fields with default values from user settings
+- Auto-save form data when navigating away or on explicit save
+- Create new version in database with each edit
+- Maintain history of all form versions
+- Visual indicator for modified but unsaved forms
+- Support for form templates based on form analyses
+- Plugin system for extending form types
+- Command pattern for undo/redo functionality
+- Background saving to prevent data loss
+
+## Form Search and Navigation
+- Display forms as sortable list by various attributes
+- Support for sorting by incident name, form type, dates, creator, etc.
+- Keyword search across form fields, incident name, types, dates, etc.
+- "Recently Used" list showing 10 most recently accessed forms
+- Display version number in search results
+- Access to previous versions of forms
+- Tabbed interface for multiple forms
+- "Recently edited" quick access panel
+- Keyboard shortcuts with visual reference
+- Dashboard view for incident form status
+
+## Form Export/Import
+- Export as JSON with all metadata
+- Export as PDF resembling original FEMA layouts
+- Export as ICS-DES format for radio transmission
+- Auto-copy ICS-DES text to clipboard
+- Default to application location for exports
+- Export all incident forms as single JSON archive
+- Batch export operations
+- Differential file format for efficient radio transmission
+- "Package" export including attachments
+- Form merging capabilities
+- Cross-form data extraction
+- JSON import with validation
+- Batch import operations
+
+## Form Attachments
+- Support for common file formats (images, PDF, text, Office docs)
+- Store attachments in file system with database references
+- Cross-platform file path handling
+- File type validation
+- Clear visual indication of attached files
+
+## Database Management
+- Auto-backup on application close
+- Support for multiple incident databases
+- Database switching
+- Archive capability (export + optional removal)
+- SQLite WAL mode for reliability
+- Migration support for schema evolution
+- Sophisticated backup rotation policy
+- Compression options for large deployments
+- Periodic integrity checks
+- Concurrent access support
+- Robust version tracking
+
+## Error Handling and Logging
+- Tiered error reporting based on severity
+- Modal dialogs for critical errors
+- Toast notifications for warnings
+- Rotating file logger
+- Comprehensive activity logging
+- Proactive space checking
+- Database corruption recovery
+- Standardized error formats with codes
+- Recovery paths for common issues
+
+## User Interface
+- PySide6 (Qt for Python) implementation
+- Tooltips for all fields and labels
+- Confirmation dialogs for destructive actions
+- Table-based widget system for repeatable sections
+- Tabbed interface for multiple forms
+- Visual data visualizations for situation awareness
+- Form completion checklist feature
+
+## Performance Requirements
+- Cold start ≤ 3 seconds
+- Form list loading ≤ 1 second for 2,000 forms
+- Form loading ≤ 300ms
+- Form saving ≤ 250ms
+- Tab switching ≤ 150ms
+- Input lag ≤ 16ms
+- Full-text search ≤ 1.5 seconds
+- PDF export ≤ 1.5 seconds
+- Memory usage ≤ 150MB base, ≤ 5MB per form
+- CPU usage ≤ 1% idle, ≤ 30% typical operations
+
+## Testing Requirements
+- Full unit test coverage
+- Automated UI testing with pytest-qt
+- Schema-based validation testing
+- Performance benchmarks
+- Property-based testing
+- Visual regression testing
+- Test data generation
+- User journey testing
+- Chaos engineering tests
+- Static analysis in CI/CD
+
+## Accessibility Requirements
+- Full keyboard navigation
+- ARIA labels for UI elements
+- High-contrast theme
+- Minimum contrast requirements for text
+- Screen reader optimization
+- WCAG 2.1 AA compliance
+
+# User Stories
+1. As an administrative staff member, I want to create a new ICS form and save it to the database so that I can document incident information.
+2. As a radio operator, I want to export a form in ICS-DES format so that I can transmit it over a low-bandwidth connection.
+3. As a user, I want to search for and sort forms by various attributes so that I can quickly find the form I need.
+4. As a user, I want to export a form as a PDF so that I can email it to the incident commander.
+5. As a user, I want to switch between different incident databases so that I can work on multiple incidents.
+6. As a user, I want to be able to work with multiple forms simultaneously using tabs so that I can be more efficient.
+7. As a user, I want keyboard shortcuts for common operations so that I can work more efficiently without using the mouse.
+8. As a user, I want visual indications of form completion status so that I can track my progress across an incident response.
+
+# Technical Requirements
+- Python 3.10+ with PySide6 (Qt for Python)
+- SQLite database with WAL mode
+- ReportLab for PDF generation
+- Event-driven architecture for component decoupling
+- Plugin system for extensibility
+- Cross-platform compatibility (Windows, macOS, Linux)
+- Modular, layered architecture
+- Command pattern for undo/redo
+- Comprehensive error handling and recovery
+- No internet dependency
+
+# Future Enhancements
+- Reporting capabilities
+- User customization of form templates
+- Digital signatures
+- "Full package" export of all incident forms
+- Cloud synchronization
+- Multi-user access with roles
+- Mobile companion app

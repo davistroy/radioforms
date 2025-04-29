@@ -22,7 +22,7 @@ This document defines the requirements for a standalone, offline-first desktop a
 * Project stakeholders who need to understand the application's functionality
 
 ### 1.4 Project Scope
-The application will be a standalone, single-file executable that stores form data in a SQLite database. It will allow users to create, manage, and export FEMA ICS forms in various formats. The application will run without an internet connection and will not require installation. The application will incorporate a plugin architecture for extensibility and a robust version tracking system.
+The application will be a standalone, single-file executable that stores form data in a SQLite database. It will allow users to create, manage, and export FEMA ICS forms in various formats. The application will run without an internet connection and will not require installation. The application will incorporate a plugin architecture for extensibility and a robust version tracking system that uses semantic versioning for the application and date-based versioning for forms.
 
 ### 1.5 References
 * DB_Design_Guidelines.md - Database design specifications
@@ -50,13 +50,22 @@ The ICS Forms Management Application is a new, standalone system designed to rep
 
 ### 2.4 Design and Implementation Constraints
 * Single-file application that can be run from any location
-* SQLite database stored in the same location as the application unless configured otherwise
 * Offline operation only; no cloud synchronization in initial release (designed for future capability)
 * Modern UI based on provided UI/UX guidelines
 * Database design based on provided DB design specifications with enhanced version tracking
 * Built using Python and PySide6 (Qt for Python) framework
 * Separate executable files for each supported platform (Windows, macOS, Linux)
 * Explicit WAL mode activation for SQLite database to improve reliability
+
+#### 2.4.1 Database Location Policy
+* **Default Location**: The application must store the SQLite database file in the same directory as the application executable by default.
+* **User-Defined Override**: The application must allow users to specify an alternate storage location for the database through the Settings interface.
+* **Portability Support**: The application must support relative paths to enable database access when the entire application directory is moved.
+* **Path Persistence**: The application must store the database location as a relative path when possible to maintain portability.
+* **Path Validation**: The application must validate the specified path for write permissions and available space before accepting it.
+* **Multi-Database Support**: The application must allow users to maintain multiple databases in different locations and switch between them.
+* **Location Reset**: The application must provide an option to reset the database location to the default setting.
+* **Cross-Platform Compatibility**: The application must properly handle platform-specific path conventions (backslashes vs. forward slashes).
 
 ### 2.5 User Documentation
 * Basic help for navigation within the application
@@ -70,6 +79,23 @@ The ICS Forms Management Application is a new, standalone system designed to rep
 * Users will have basic computer literacy
 * Users will have sufficient disk space for the application and database
 * Users will have permissions to write to the local file system
+
+### 2.7 Versioning Strategy
+
+#### 2.7.1 Description
+The application implements a consistent versioning strategy across application releases, form templates, and individual form instances to ensure clarity, traceability, and compatibility.
+
+#### 2.7.2 Requirements
+* **REQ-2.7.1**: Application versioning must follow Semantic Versioning (MAJOR.MINOR.PATCH), where:
+  * MAJOR version increments represent incompatible API changes
+  * MINOR version increments represent backwards-compatible functionality additions
+  * PATCH version increments represent backwards-compatible bug fixes
+* **REQ-2.7.2**: Form templates must be versioned with date-based versioning (YYYY-MM-DD)
+* **REQ-2.7.3**: Individual form instances must use date-based versioning (YYYY-MM-DD) with an optional sequence number for multiple revisions on the same day
+* **REQ-2.7.4**: Database schema changes must be tracked with explicit migration scripts tied to application versions
+* **REQ-2.7.5**: The application must display the current version number prominently in the UI, including in exports and printouts
+* **REQ-2.7.6**: The application must maintain backward compatibility for loading forms created in earlier versions
+* **REQ-2.7.7**: Documentation must be versioned consistently with the application
 
 ## 3. System Features
 
@@ -234,20 +260,37 @@ The application provides a first-run experience to guide new users through initi
 ### 3.11 Error Handling and Logging
 
 #### 3.11.1 Description
-The application provides robust error handling and logging capabilities to facilitate troubleshooting and prevent data loss.
+The application provides robust error handling and logging capabilities to facilitate troubleshooting and prevent data loss. The system implements a comprehensive error classification system with standardized error codes and consistent handling across all components.
 
-#### 3.11.2 Functional Requirements
+#### 3.11.2 Error Severity Classification
+* **Critical Errors**: Issues that prevent core application functionality and require immediate user attention
+* **Errors**: Problems that impact specific operations but allow the application to continue functioning
+* **Warnings**: Issues that may affect operation but don't prevent functionality
+* **Information**: Notifications that don't indicate problems but inform the user about operations
+
+#### 3.11.3 Error Code Structure
+All errors use a consistent code structure in the format `[CATEGORY]-[SEVERITY]-[NUMBER]`:
+* **Category**: 3-letter code indicating the subsystem (e.g., DB for database, UI for interface)
+* **Severity**: 1-letter code indicating severity (C=Critical, E=Error, W=Warning, I=Info)
+* **Number**: 3-digit numeric identifier unique within the category and severity
+
+Example: `DB-C-001` for a critical database error with identifier 001.
+
+#### 3.11.4 Functional Requirements
 * **REQ-3.11.1**: The application must implement a tiered error reporting system that presents errors based on severity.
-* **REQ-3.11.2**: Critical errors must be displayed in dialog boxes with clear explanations and recovery options.
-* **REQ-3.11.3**: Warning-level issues should be displayed using toast notifications.
-* **REQ-3.11.4**: The application must implement a rotating file logger using Python's logging module.
-* **REQ-3.11.5**: The application must log all critical operations, errors, and exceptions.
-* **REQ-3.11.6**: The application must implement proactive space checking before significant write operations.
-* **REQ-3.11.7**: The application must provide recovery options if database corruption is detected.
-* **REQ-3.11.8**: The application must create an error severity classification system that's consistent across all components.
-* **REQ-3.11.9**: The application must implement all error types (critical, error, warning, info) consistently in the ErrorHandler class.
-* **REQ-3.11.10**: The application must add specific error codes for common issues that can be referenced in documentation.
-* **REQ-3.11.11**: The application must create a standardized error logging format that includes all necessary context.
+* **REQ-3.11.2**: Critical errors must be displayed in modal dialog boxes with clear explanations and recovery options.
+* **REQ-3.11.3**: Errors must be displayed in non-modal dialog boxes with explanations and suggested actions.
+* **REQ-3.11.4**: Warning-level issues must be displayed using toast notifications with appropriate icons.
+* **REQ-3.11.5**: Information messages must be displayed in the status bar or as brief toast notifications.
+* **REQ-3.11.6**: The application must implement a rotating file logger using Python's logging module.
+* **REQ-3.11.7**: The application must log all operations, errors, and exceptions with appropriate severity levels.
+* **REQ-3.11.8**: The application must implement proactive space checking before significant write operations.
+* **REQ-3.11.9**: The application must provide recovery options if database corruption is detected.
+* **REQ-3.11.10**: The application must implement all error types consistently in the ErrorHandler class.
+* **REQ-3.11.11**: All error messages must include error codes that reference comprehensive documentation.
+* **REQ-3.11.12**: The application must create a standardized error logging format that includes timestamp, severity, code, component, and context information.
+* **REQ-3.11.13**: Error handling must provide recovery paths whenever possible rather than simply reporting failures.
+* **REQ-3.11.14**: A comprehensive error code reference must be maintained as part of the application documentation.
 
 ## 4. Data Requirements
 
@@ -345,19 +388,61 @@ The application interacts with the operating system and file system.
 ### 6.1 Performance Requirements
 
 #### 6.1.1 Description
-The application must perform operations within reasonable time frames.
+The application must perform operations within defined time frames to ensure a responsive user experience even with large datasets. Performance requirements are specified as measurable benchmarks to ensure consistent performance across all supported platforms.
 
-#### 6.1.2 Requirements
-* **REQ-6.1.1**: The application must follow best practices for performance optimization.
-* **REQ-6.1.2**: The application must handle a database with up to 2,000 records without significant performance degradation.
-* **REQ-6.1.3**: Form list loading must complete in less than 1 second for 2,000 forms.
-* **REQ-6.1.4**: Form opening must complete in less than 0.5 second per form.
-* **REQ-6.1.5**: Form saving must complete in less than 0.5 second.
-* **REQ-6.1.6**: The application must implement pagination and lazy loading for lists to improve performance.
-* **REQ-6.1.7**: The application must implement lazy loading for form sections to improve initial load times.
-* **REQ-6.1.8**: The application must add background saving to prevent data loss without impacting user experience.
-* **REQ-6.1.9**: The application must implement a more efficient data caching strategy for repeated form access.
-* **REQ-6.1.10**: The application must add batch operations for working with multiple forms simultaneously.
+#### 6.1.2 Application Startup Performance
+* **REQ-6.1.1**: Cold start time must not exceed 3 seconds on minimum specification hardware.
+* **REQ-6.1.2**: Warm start time must not exceed 1.5 seconds on minimum specification hardware.
+* **REQ-6.1.3**: Startup diagnostics must complete within 500ms.
+* **REQ-6.1.4**: Initial UI render must complete within 800ms from application launch.
+
+#### 6.1.3 Database Operations
+* **REQ-6.1.5**: Form list loading must complete in less than 1 second for 2,000 forms with pagination.
+* **REQ-6.1.6**: Form list filtering and sorting operations must complete within 250ms.
+* **REQ-6.1.7**: Full-text search across 2,000 forms must return results within 1.5 seconds.
+* **REQ-6.1.8**: Loading a single form must complete within 300ms from selection to display.
+* **REQ-6.1.9**: Saving a new form must complete within 200ms.
+* **REQ-6.1.10**: Updating an existing form must complete within 250ms.
+* **REQ-6.1.11**: Retrieving form version history must complete within 500ms for up to 50 versions.
+* **REQ-6.1.12**: Database backup creation must complete within 5 seconds for a 100MB database.
+* **REQ-6.1.13**: Database integrity check must complete within 3 seconds for a 100MB database.
+
+#### 6.1.4 UI Responsiveness
+* **REQ-6.1.14**: Tab switching between open forms must complete within 150ms.
+* **REQ-6.1.15**: Form field updates must reflect within 50ms from input to display.
+* **REQ-6.1.16**: Complete form validation must execute within 200ms.
+* **REQ-6.1.17**: Modal dialog displays must render within 100ms.
+* **REQ-6.1.18**: Menu operations must execute within 100ms from selection to action.
+* **REQ-6.1.19**: Scrolling performance must maintain 60fps during form navigation.
+* **REQ-6.1.20**: Input lag must not exceed 16ms (1 frame at 60fps) from input to feedback.
+
+#### 6.1.5 Export/Import Performance
+* **REQ-6.1.21**: PDF export for a single form must complete within 1.5 seconds.
+* **REQ-6.1.22**: Batch PDF export for 10 forms must complete within 10 seconds.
+* **REQ-6.1.23**: JSON export for a single form must complete within 200ms.
+* **REQ-6.1.24**: Batch JSON export for 50 forms must complete within 5 seconds.
+* **REQ-6.1.25**: ICS-DES encoding for a single form must complete within 100ms.
+* **REQ-6.1.26**: Package export with attachments must process at a rate of at least 10MB per 5 seconds.
+* **REQ-6.1.27**: Incident archive export for 100 forms must complete within 10 seconds.
+* **REQ-6.1.28**: JSON import for a single form must complete within 300ms.
+* **REQ-6.1.29**: Batch import for 10 forms must complete within 3 seconds.
+
+#### 6.1.6 Resource Utilization
+* **REQ-6.1.30**: Base memory footprint must not exceed 150MB with no forms open.
+* **REQ-6.1.31**: Memory usage per open form must not exceed 5MB.
+* **REQ-6.1.32**: Maximum memory usage must not exceed 500MB under normal operations.
+* **REQ-6.1.33**: Memory growth after 8 hours of continuous use must not exceed 5%.
+* **REQ-6.1.34**: CPU usage when idle must not exceed 1% of a single core.
+* **REQ-6.1.35**: CPU usage during typical operations must not exceed 30% of a single core.
+* **REQ-6.1.36**: CPU usage during export operations must not exceed 70% of a single core.
+
+#### 6.1.7 Implementation Requirements
+* **REQ-6.1.37**: The application must implement pagination and lazy loading for lists to improve performance.
+* **REQ-6.1.38**: The application must implement lazy loading for form sections to improve initial load times.
+* **REQ-6.1.39**: The application must implement background saving to prevent data loss without impacting user experience.
+* **REQ-6.1.40**: The application must implement a data caching strategy for repeated form access.
+* **REQ-6.1.41**: The application must support batch operations for working with multiple forms simultaneously.
+* **REQ-6.1.42**: The application must implement performance testing benchmarks to validate these requirements.
 
 ### 6.2 Safety Requirements
 
@@ -466,7 +551,8 @@ The application must be thoroughly tested to ensure reliability and correctness.
 4. As a user, I want to export a form as a PDF so that I can email it to the incident commander.
 5. As a user, I want to switch between different incident databases so that I can work on multiple incidents.
 6. As a user, I want to be able to work with multiple forms simultaneously using tabs so that I can be more efficient.
-7. As a user, I want keyboard shortcuts
+7. As a user, I want keyboard shortcuts for common operations so that I can work more efficiently without using the mouse.
+8. As a user, I want visual indications of form completion status so that I can track my progress across an incident response.
 
 ## 9. Testing Requirements (continued)
 
