@@ -2,396 +2,265 @@
 # -*- coding: utf-8 -*-
 
 """
-Configuration manager for application settings and user profiles.
+Configuration Manager for RadioForms.
 
-This module provides functionality for storing and retrieving configuration
-settings, managing user profiles, and handling application startup settings.
+This module provides a configuration manager for RadioForms that handles
+reading, writing, and managing application configuration settings.
 """
 
-import ctypes
-import json
-import logging
 import os
-import time
-from datetime import datetime
+import sys
+import logging
+import configparser
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple
-
-from radioforms.database.dao.setting_dao import SettingDAO
-from radioforms.database.dao.user_dao import UserDAO
-from radioforms.database.db_manager import DatabaseManager
-from radioforms.database.models.setting import Setting
+from typing import Dict, Any, Optional, List, Union
 
 
 class ConfigManager:
     """
-    Manages application configuration settings and user profiles.
+    Configuration manager for RadioForms.
     
-    This class handles the storage and retrieval of application settings,
-    user profile information, and configuration data in the database.
+    This class handles reading, writing, and managing application
+    configuration settings. It provides a simple interface for accessing
+    and modifying configuration values with default fallbacks.
     """
     
-    # Configuration key constants
-    FIRST_RUN = "app.first_run"
-    LAST_USER_ID = "app.last_user_id"
-    LAST_INCIDENT_ID = "app.last_incident_id"
-    APP_VERSION = "app.version"
-    
-    def __init__(self, db_manager: DatabaseManager):
+    def __init__(self, config_path: str):
         """
         Initialize the configuration manager.
         
         Args:
-            db_manager: Database manager instance for data storage
+            config_path: Path to the configuration file
         """
-        self.db_manager = db_manager
-        self.setting_dao = SettingDAO(db_manager)
-        self.user_dao = UserDAO(db_manager)
-        self.cache = {}  # Simple cache for frequently accessed settings
+        self._config_path = config_path
+        self._config = configparser.ConfigParser()
+        self._logger = logging.getLogger(__name__)
         
-        # Initialize with default configuration if needed
-        self._init_config()
-    
-    def _init_config(self):
-        """Initialize default configuration if this is the first run."""
-        # Check if the first run flag is set
-        first_run = self.get_setting(self.FIRST_RUN, None)
+        # Load configuration if file exists
+        self._load()
         
-        if first_run is None:
-            # This is the first run, set up default configuration
-            with self.db_manager.transaction():
-                # Set the first run flag to False for future runs
-                self.set_setting(self.FIRST_RUN, "false")
-                
-                # Set the application version
-                self.set_setting(self.APP_VERSION, "0.1.0")
-                
-                # Log initialization
-                logging.info("Initialized default configuration")
-    
-    def is_first_run(self) -> bool:
-        """
-        Check if this is the first run of the application.
-        
-        Returns:
-            True if this is the first run, False otherwise
-        """
-        first_run = self.get_setting(self.FIRST_RUN, None)
-        return first_run is None or first_run.lower() == "true"
-    
-    def get_setting(self, key: str, default: Any = None) -> Any:
-        """
-        Get a configuration setting value.
-        
-        Args:
-            key: Setting key
-            default: Default value if setting is not found
-            
-        Returns:
-            Setting value, or default if not found
-        """
-        # Check cache first
-        if key in self.cache:
-            return self.cache[key]
-        
-        # Query the database
-        setting = self.setting_dao.find_by_key(key)
-        
-        if setting:
-            # Cache the result for future use
-            self.cache[key] = setting.value
-            return setting.value
-        
-        return default
-    
-    def set_setting(self, key: str, value: Any) -> bool:
-        """
-        Set a configuration setting value.
-        
-        Args:
-            key: Setting key
-            value: Setting value
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        # Update cache
-        self.cache[key] = value
-        
-        # Check if setting exists
-        setting_obj = self.setting_dao.find_by_key(key)
-        
-        if setting_obj:
-            # Update existing setting
-            setting_obj.value = value
-            setting_obj.updated_at = datetime.now()
-            # Pass the updated entity directly to the update method
-            result = self.setting_dao.update(setting_obj)
-            return result is not None
+    def _load(self):
+        """Load configuration from the file."""
+        if os.path.exists(self._config_path):
+            try:
+                self._config.read(self._config_path)
+                self._logger.info(f"Configuration loaded from {self._config_path}")
+            except Exception as e:
+                self._logger.error(f"Failed to load configuration: {e}")
         else:
-            # Create new setting
-            new_setting = Setting(
-                key=key,
-                value=value,
-                created_at=datetime.now(),
-                updated_at=datetime.now()
-            )
-            setting_id = self.setting_dao.create(new_setting)
-            return setting_id is not None
-    
-    def clear_cache(self):
-        """Clear the configuration cache."""
-        self.cache = {}
-    
-    def get_current_user(self) -> Optional[Dict[str, Any]]:
-        """
-        Get the current user profile.
-        
-        Returns:
-            Current user profile, or None if not set
-        """
-        user_id = self.get_setting(self.LAST_USER_ID)
-        if not user_id:
-            return None
-        
+            self._logger.info(f"Configuration file {self._config_path} does not exist, using defaults")
+            
+    def save(self):
+        """Save configuration to the file."""
         try:
-            user_id = int(user_id)
-            # Use as_dict=True to ensure dictionary return type
-            return self.user_dao.find_by_id(user_id, as_dict=True)
-        except (ValueError, TypeError):
-            return None
-    
-    def set_current_user(self, user_id: int) -> bool:
+            # Ensure the directory exists
+            config_dir = os.path.dirname(self._config_path)
+            os.makedirs(config_dir, exist_ok=True)
+            
+            # Write the configuration to the file
+            with open(self._config_path, 'w') as config_file:
+                self._config.write(config_file)
+                
+            self._logger.info(f"Configuration saved to {self._config_path}")
+            return True
+        except Exception as e:
+            self._logger.error(f"Failed to save configuration: {e}")
+            return False
+            
+    def get_value(self, section: str, key: str, default: str = "") -> str:
         """
-        Set the current user profile.
+        Get a configuration value.
         
         Args:
-            user_id: User ID to set as current
+            section: Configuration section
+            key: Configuration key
+            default: Default value if section/key doesn't exist
             
         Returns:
-            True if successful, False otherwise
+            The configuration value, or the default if not found
         """
-        return self.set_setting(self.LAST_USER_ID, str(user_id))
-    
-    def get_users(self) -> List[Dict[str, Any]]:
-        """
-        Get all user profiles.
-        
-        Returns:
-            List of user profiles as dictionaries
-        """
-        return self.user_dao.find_all(as_dict=True)
-    
-    def create_or_update_user(self, user_data: Dict[str, Any]) -> Optional[int]:
-        """
-        Create a new user profile or update an existing one.
-        
-        Args:
-            user_data: User profile data
-            
-        Returns:
-            User ID if successful, None otherwise
-        """
-        user_id = user_data.get('id')
-        
-        with self.db_manager.transaction():
-            if user_id:
-                # Update existing user
-                user_data['updated_at'] = datetime.now()
-                # Convert to a User object before updating
-                from radioforms.database.models.user import User
-                user_obj = User(
-                    id=user_id,
-                    name=user_data.get('name', ''),
-                    call_sign=user_data.get('call_sign'),
-                    last_login=user_data.get('last_login'),
-                    created_at=user_data.get('created_at'),
-                    updated_at=user_data.get('updated_at')
-                )
-                result = self.user_dao.update(user_obj)
-                return user_id if result else None
+        try:
+            if section in self._config and key in self._config[section]:
+                return self._config[section][key]
             else:
-                # Create new user
-                user_data['created_at'] = datetime.now()
-                user_data['updated_at'] = datetime.now()
-                # Convert to a User object before creating
-                from radioforms.database.models.user import User
-                user_obj = User(
-                    name=user_data.get('name', ''),
-                    call_sign=user_data.get('call_sign'),
-                    last_login=user_data.get('last_login'),
-                    created_at=user_data.get('created_at'),
-                    updated_at=user_data.get('updated_at')
-                )
-                return self.user_dao.create(user_obj)
-    
-    def validate_database(self) -> Tuple[bool, List[str]]:
-        """
-        Validate the database structure and integrity.
-        
-        Returns:
-            Tuple of (success, error_messages)
-        """
-        errors = []
-        
-        try:
-            # Check that we can query settings
-            self.setting_dao.find_all()
-            
-            # Check that we can query users
-            self.user_dao.find_all()
-            
+                return default
         except Exception as e:
-            errors.append(f"Database validation error: {str(e)}")
-            return False, errors
-        
-        return len(errors) == 0, errors
-
-
-class SystemIntegrityChecker:
-    """
-    Checks the integrity of the application system.
-    
-    This class provides functionality to verify the integrity of the
-    application, including file system access, disk space, and
-    database connection.
-    """
-    
-    def __init__(self, db_manager: DatabaseManager, app_directory: str):
+            self._logger.error(f"Failed to get configuration value {section}.{key}: {e}")
+            return default
+            
+    def set_value(self, section: str, key: str, value: str):
         """
-        Initialize the system integrity checker.
+        Set a configuration value.
         
         Args:
-            db_manager: Database manager instance
-            app_directory: Application directory path
+            section: Configuration section
+            key: Configuration key
+            value: Value to set
         """
-        self.db_manager = db_manager
-        self.app_directory = Path(app_directory)
-    
-    def check_file_system_access(self) -> Tuple[bool, List[str]]:
-        """
-        Check if the application has access to the file system.
-        
-        Returns:
-            Tuple of (success, error_messages)
-        """
-        errors = []
-        
-        # Check if the application directory exists and is readable
-        if not self.app_directory.exists():
-            errors.append(f"Application directory does not exist: {self.app_directory}")
-            return False, errors
-        
-        if not os.access(self.app_directory, os.R_OK):
-            errors.append(f"Cannot read from application directory: {self.app_directory}")
-            return False, errors
-        
-        # Check write access by creating a temporary file
-        test_file = self.app_directory / f".test_{time.time()}"
         try:
-            with open(test_file, 'w') as f:
-                f.write("test")
-            os.remove(test_file)
+            # Create section if it doesn't exist
+            if section not in self._config:
+                self._config[section] = {}
+                
+            # Set the value
+            self._config[section][key] = str(value)
+            
+            self._logger.debug(f"Configuration value {section}.{key} set to {value}")
         except Exception as e:
-            errors.append(f"Cannot write to application directory: {str(e)}")
-            return False, errors
-        
-        return True, []
-    
-    def check_disk_space(self, min_free_mb: int = 100) -> Tuple[bool, List[str]]:
+            self._logger.error(f"Failed to set configuration value {section}.{key}: {e}")
+            
+    def get_boolean(self, section: str, key: str, default: bool = False) -> bool:
         """
-        Check if there is enough disk space available.
+        Get a boolean configuration value.
         
         Args:
-            min_free_mb: Minimum required free space in MB
+            section: Configuration section
+            key: Configuration key
+            default: Default value if section/key doesn't exist
             
         Returns:
-            Tuple of (success, error_messages)
+            The configuration value as a boolean, or the default if not found
         """
-        errors = []
+        value = self.get_value(section, key, str(default)).lower()
+        return value in ["true", "yes", "1", "t", "y"]
         
+    def get_int(self, section: str, key: str, default: int = 0) -> int:
+        """
+        Get an integer configuration value.
+        
+        Args:
+            section: Configuration section
+            key: Configuration key
+            default: Default value if section/key doesn't exist
+            
+        Returns:
+            The configuration value as an integer, or the default if not found
+        """
         try:
-            # Get free space on the drive where the application is located
-            if os.name == 'nt':  # Windows
-                free_bytes = ctypes.c_ulonglong(0)
-                ctypes.windll.kernel32.GetDiskFreeSpaceExW(
-                    ctypes.c_wchar_p(str(self.app_directory)),
-                    None, None,
-                    ctypes.byref(free_bytes)
-                )
-                free_mb = free_bytes.value / (1024 * 1024)
-            else:  # Unix-like
-                stat = os.statvfs(self.app_directory)
-                free_mb = (stat.f_frsize * stat.f_bavail) / (1024 * 1024)
+            return int(self.get_value(section, key, str(default)))
+        except ValueError:
+            return default
             
-            if free_mb < min_free_mb:
-                errors.append(
-                    f"Insufficient disk space: {free_mb:.1f} MB available, "
-                    f"{min_free_mb} MB required"
-                )
-                return False, errors
-                
-        except Exception as e:
-            errors.append(f"Error checking disk space: {str(e)}")
-            return False, errors
-        
-        return True, []
-    
-    def check_database_connection(self) -> Tuple[bool, List[str]]:
+    def get_float(self, section: str, key: str, default: float = 0.0) -> float:
         """
-        Check if the database connection is working.
+        Get a float configuration value.
         
+        Args:
+            section: Configuration section
+            key: Configuration key
+            default: Default value if section/key doesn't exist
+            
         Returns:
-            Tuple of (success, error_messages)
+            The configuration value as a float, or the default if not found
         """
-        errors = []
-        
         try:
-            # Execute a simple query to verify connection
-            cursor = self.db_manager.execute("SELECT 1")
-            result = cursor.fetchone()
+            return float(self.get_value(section, key, str(default)))
+        except ValueError:
+            return default
             
-            if result is None or result[0] != 1:
-                errors.append("Database connection test failed")
-                return False, errors
-                
-        except Exception as e:
-            errors.append(f"Database connection error: {str(e)}")
-            return False, errors
-        
-        return True, []
-    
-    def check_all(self) -> Tuple[bool, Dict[str, Any]]:
+    def get_list(self, section: str, key: str, default: List[str] = None) -> List[str]:
         """
-        Run all integrity checks.
+        Get a list configuration value.
+        
+        Args:
+            section: Configuration section
+            key: Configuration key
+            default: Default value if section/key doesn't exist
+            
+        Returns:
+            The configuration value as a list, or the default if not found
+        """
+        if default is None:
+            default = []
+            
+        value = self.get_value(section, key, "")
+        if not value:
+            return default
+            
+        # Split the value by commas
+        return [item.strip() for item in value.split(",")]
+        
+    def get_sections(self) -> List[str]:
+        """
+        Get all configuration sections.
         
         Returns:
-            Tuple of (success, results_dict)
+            List of section names
         """
-        results = {}
+        return list(self._config.sections())
         
-        # Check file system access
-        fs_success, fs_errors = self.check_file_system_access()
-        results['file_system'] = {
-            'success': fs_success,
-            'errors': fs_errors
-        }
+    def get_section_values(self, section: str) -> Dict[str, str]:
+        """
+        Get all values in a section.
         
-        # Check disk space
-        disk_success, disk_errors = self.check_disk_space()
-        results['disk_space'] = {
-            'success': disk_success,
-            'errors': disk_errors
-        }
+        Args:
+            section: Configuration section
+            
+        Returns:
+            Dictionary of key-value pairs in the section
+        """
+        if section in self._config:
+            return dict(self._config[section])
+        else:
+            return {}
+            
+    def remove_section(self, section: str):
+        """
+        Remove a configuration section.
         
-        # Check database connection
-        db_success, db_errors = self.check_database_connection()
-        results['database'] = {
-            'success': db_success,
-            'errors': db_errors
-        }
+        Args:
+            section: Configuration section to remove
+        """
+        if section in self._config:
+            self._config.remove_section(section)
+            
+    def remove_option(self, section: str, key: str):
+        """
+        Remove a configuration option.
         
-        # Check if all checks passed
-        all_success = fs_success and disk_success and db_success
+        Args:
+            section: Configuration section
+            key: Configuration key to remove
+        """
+        if section in self._config and key in self._config[section]:
+            self._config.remove_option(section, key)
+
+
+def load_default_config() -> ConfigManager:
+    """
+    Load the default application configuration.
+    
+    Returns:
+        ConfigManager instance with default configuration
+    """
+    # Determine config path
+    config_dir = Path.home() / ".radioforms"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    config_path = str(config_dir / "config.ini")
+    
+    # Create config manager
+    config_manager = ConfigManager(config_path)
+    
+    # Set default values if not already set
+    if not config_manager.get_value("General", "first_run"):
+        config_manager.set_value("General", "first_run", "true")
         
-        return all_success, results
+    if not config_manager.get_value("Database", "path"):
+        # Default database path
+        documents_path = Path.home() / "Documents" / "RadioForms"
+        documents_path.mkdir(parents=True, exist_ok=True)
+        db_path = str(documents_path / "radioforms.db")
+        config_manager.set_value("Database", "path", db_path)
+        
+    if not config_manager.get_value("Database", "auto_backup"):
+        config_manager.set_value("Database", "auto_backup", "true")
+        
+    if not config_manager.get_value("Forms", "enabled_forms"):
+        # Default enabled forms
+        enabled_forms = ["ICS-213", "ICS-214", "ICS-309"]
+        config_manager.set_value("Forms", "enabled_forms", ",".join(enabled_forms))
+        
+    # Save config if any defaults were applied
+    config_manager.save()
+    
+    return config_manager
