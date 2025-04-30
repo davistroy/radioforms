@@ -9,6 +9,7 @@ of the application.
 import sys
 import os
 from pathlib import Path
+from typing import Dict, Any, List, Optional
 from PySide6.QtCore import QObject, Signal, Slot
 
 from radioforms.views.main_window import MainWindow
@@ -17,6 +18,7 @@ from radioforms.database.db_manager import DatabaseManager
 from radioforms.config.app_config import AppConfig
 from radioforms.config.config_manager import ConfigManager, SystemIntegrityChecker
 from radioforms.controllers.forms_controller import FormsController
+from radioforms.controllers.api_controller import APIController
 
 
 class AppController(QObject):
@@ -32,6 +34,7 @@ class AppController(QObject):
         self.db_manager = None
         self.main_window = None
         self.config_manager = None
+        self.api_controller = None
         
         # Initialize sub-controllers
         self.forms_controller = FormsController(self)
@@ -56,6 +59,9 @@ class AppController(QObject):
         try:
             self.db_manager = DatabaseManager(self.config.get('database', 'path'))
             # Perform any necessary database setup or migrations
+            
+            # Initialize the API controller once we have a database connection
+            self.api_controller = APIController(self.db_manager, self)
         except Exception as e:
             # In a real application, this would use the error handling system
             print(f"Database initialization error: {e}")
@@ -161,6 +167,88 @@ class AppController(QObject):
         """
         return self.forms_controller.get_available_form_types()
         
+    # ----- API-style dictionary interface methods -----
+    
+    def get_active_incidents(self) -> List[Dict[str, Any]]:
+        """
+        Get all active incidents as dictionaries.
+        
+        This method provides an API-style interface for UI components
+        that need incident data in dictionary format.
+        
+        Returns:
+            List of incident dictionaries
+        """
+        if self.api_controller:
+            return self.api_controller.get_active_incidents()
+        return []
+    
+    def get_forms_for_incident(self, incident_id: int) -> List[Dict[str, Any]]:
+        """
+        Get all forms for an incident as dictionaries.
+        
+        This method provides an API-style interface for UI components
+        that need form data in dictionary format.
+        
+        Args:
+            incident_id: ID of the incident
+            
+        Returns:
+            List of form dictionaries
+        """
+        if self.api_controller:
+            return self.api_controller.get_forms_for_incident(incident_id)
+        return []
+    
+    def get_form_with_content(self, form_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Get a form with its content as dictionaries.
+        
+        This method provides an API-style interface for UI components
+        that need form and content data in dictionary format.
+        
+        Args:
+            form_id: ID of the form
+            
+        Returns:
+            Dictionary with 'form' and 'content' keys, or None if not found
+        """
+        if self.api_controller:
+            return self.api_controller.get_form_with_content(form_id)
+        return None
+    
+    def get_incident_stats(self) -> Dict[str, int]:
+        """
+        Get incident statistics.
+        
+        This method provides an API-style interface for UI components
+        that need incident statistics in dictionary format.
+        
+        Returns:
+            Dictionary with incident statistics
+        """
+        if self.api_controller:
+            return self.api_controller.get_incident_stats()
+        return {'total': 0, 'active': 0, 'closed': 0}
+    
+    def get_recent_forms(self, limit: int = 10, incident_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get recently updated forms as dictionaries.
+        
+        This method provides an API-style interface for UI components
+        that need recent forms data in dictionary format.
+        
+        Args:
+            limit: Maximum number of forms to return
+            incident_id: Optional incident ID to filter by
+            
+        Returns:
+            List of form dictionaries
+        """
+        if self.api_controller:
+            return self.api_controller.get_recent_forms(limit, incident_id)
+        return []
+    
     def shutdown(self):
         """Clean up resources and prepare for application shutdown."""
         # Close database connections

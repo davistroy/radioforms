@@ -95,7 +95,7 @@ class ConfigManager:
             return self.cache[key]
         
         # Query the database
-        setting = self.setting_dao.get_by_key(key)
+        setting = self.setting_dao.find_by_key(key)
         
         if setting:
             # Cache the result for future use
@@ -119,7 +119,7 @@ class ConfigManager:
         self.cache[key] = value
         
         # Check if setting exists
-        setting_obj = self.setting_dao.get_by_key(key)
+        setting_obj = self.setting_dao.find_by_key(key)
         
         if setting_obj:
             # Update existing setting
@@ -156,7 +156,8 @@ class ConfigManager:
         
         try:
             user_id = int(user_id)
-            return self.user_dao.get_by_id(user_id)
+            # Use as_dict=True to ensure dictionary return type
+            return self.user_dao.find_by_id(user_id, as_dict=True)
         except (ValueError, TypeError):
             return None
     
@@ -177,9 +178,9 @@ class ConfigManager:
         Get all user profiles.
         
         Returns:
-            List of user profiles
+            List of user profiles as dictionaries
         """
-        return self.user_dao.find_all()
+        return self.user_dao.find_all(as_dict=True)
     
     def create_or_update_user(self, user_data: Dict[str, Any]) -> Optional[int]:
         """

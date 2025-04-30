@@ -133,6 +133,7 @@ class DatabaseManager:
             file_type TEXT,
             file_size INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (form_id) REFERENCES forms(id)
         )
         ''')

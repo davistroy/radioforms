@@ -183,14 +183,23 @@ class DAOTestCase(unittest.TestCase):
         self.assertIsNotNone(form)
         self.assertEqual(form.title, "Test Message Form")
         
-        # Test get with content
-        form_with_content = self.form_dao.get_with_content(self.test_form.id)
+        # Test find with content
+        form_with_content = self.form_dao.find_with_content(self.test_form.id)
         self.assertIsNotNone(form_with_content)
         self.assertIsInstance(form_with_content, tuple)
         self.assertEqual(len(form_with_content), 2)
         self.assertEqual(form_with_content[0].id, self.test_form.id)
         self.assertIsInstance(form_with_content[1], dict)
         self.assertEqual(form_with_content[1]["to"], "Command")
+        
+        # Test find with content as dict
+        form_with_content_dict = self.form_dao.find_with_content(self.test_form.id, as_dict=True)
+        self.assertIsNotNone(form_with_content_dict)
+        self.assertIsInstance(form_with_content_dict, tuple)
+        self.assertEqual(len(form_with_content_dict), 2)
+        self.assertIsInstance(form_with_content_dict[0], dict)
+        self.assertEqual(form_with_content_dict[0]["id"], self.test_form.id)
+        self.assertEqual(form_with_content_dict[1]["to"], "Command")
         
         # Test update with content
         updated_content = {
@@ -205,12 +214,12 @@ class DAOTestCase(unittest.TestCase):
         self.assertTrue(self.form_dao.update_with_content(form, updated_content, self.test_user.id))
         
         # Verify update
-        updated_form = self.form_dao.get_with_content(form.id)
+        updated_form = self.form_dao.find_with_content(form.id)
         self.assertEqual(updated_form[0].title, "Updated Message Form")
         self.assertEqual(updated_form[1]["to"], "Updated Command")
         
         # Test get all versions
-        versions = self.form_dao.get_all_versions(form.id)
+        versions = self.form_dao.find_all_versions(form.id)
         self.assertEqual(len(versions), 2)  # Initial + update
         
         # Test find by incident
@@ -288,10 +297,18 @@ class DAOTestCase(unittest.TestCase):
         self.assertIsNotNone(setting)
         self.assertEqual(setting.key, "test.setting")
         
-        # Test get by key
-        setting = self.setting_dao.get_by_key("test.setting")
+        # Test find by key
+        setting = self.setting_dao.find_by_key("test.setting")
         self.assertIsNotNone(setting)
+        self.assertEqual(setting.key, "test.setting")
         self.assertEqual(setting.value, "test_value")
+        
+        # Test find by key with as_dict
+        setting_dict = self.setting_dao.find_by_key("test.setting", as_dict=True)
+        self.assertIsNotNone(setting_dict)
+        self.assertIsInstance(setting_dict, dict)
+        self.assertEqual(setting_dict["key"], "test.setting")
+        self.assertEqual(setting_dict["value"], "test_value")
         
         # Test get value
         value = self.setting_dao.get_value("test.setting")
@@ -306,7 +323,7 @@ class DAOTestCase(unittest.TestCase):
         self.assertEqual(updated_setting.value, "updated_value")
         
         # Verify update
-        setting = self.setting_dao.get_by_key("test.setting")
+        setting = self.setting_dao.find_by_key("test.setting")
         self.assertEqual(setting.value, "updated_value")
         
         # Test set value (create new)
@@ -314,7 +331,7 @@ class DAOTestCase(unittest.TestCase):
         self.assertIsNotNone(new_setting.id)
         
         # Verify creation
-        setting = self.setting_dao.get_by_key("new.setting")
+        setting = self.setting_dao.find_by_key("new.setting")
         self.assertIsNotNone(setting)
         self.assertEqual(setting.value, 42)
         
@@ -348,7 +365,7 @@ class DAOTestCase(unittest.TestCase):
         self.assertTrue(self.setting_dao.delete_by_key("test.setting"))
         
         # Verify deletion
-        setting = self.setting_dao.get_by_key("test.setting")
+        setting = self.setting_dao.find_by_key("test.setting")
         self.assertIsNone(setting)
         
     def test_transaction_handling(self):

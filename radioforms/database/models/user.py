@@ -2,77 +2,101 @@
 # -*- coding: utf-8 -*-
 
 """
-User entity model representing a user in the system.
+User model for the application.
+
+This module defines the User model class which represents a user in the application.
 """
 
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-from radioforms.database.models.base_model import TimestampedModel
 
-
-class User(TimestampedModel):
+class User:
     """
-    User entity model representing a user in the system.
+    User model class.
     
-    Stores user information such as name, call sign, and last login time.
+    This class represents a user in the application.
     """
     
-    def __init__(self, id: Optional[int] = None, 
-                name: str = "", 
-                call_sign: Optional[str] = None,
-                last_login: Optional[datetime] = None,
-                created_at: Optional[datetime] = None,
-                updated_at: Optional[datetime] = None):
+    def __init__(
+        self,
+        id: Optional[int] = None,
+        name: str = "",
+        call_sign: Optional[str] = None,
+        last_login: Optional[datetime] = None,
+        created_at: Optional[datetime] = None,
+        updated_at: Optional[datetime] = None
+    ):
         """
-        Initialize a User entity.
+        Initialize a User object.
         
         Args:
-            id: User ID
-            name: User's full name
-            call_sign: User's call sign (optional)
-            last_login: Timestamp of the user's last login (optional)
-            created_at: Timestamp when the user was created
-            updated_at: Timestamp when the user was last updated
+            id: User ID (None for new users)
+            name: User's name
+            call_sign: User's call sign (amateur radio)
+            last_login: Last login time
+            created_at: Creation time
+            updated_at: Last update time
         """
-        super().__init__(id, created_at, updated_at)
+        self.id = id
         self.name = name
         self.call_sign = call_sign
         self.last_login = last_login
-        
-    def update_last_login(self):
-        """Update the last_login timestamp to the current time."""
-        self.last_login = datetime.now()
-        self.touch()  # Also update the updated_at timestamp
-        
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'User':
-        """
-        Create a User instance from a dictionary.
-        
-        Args:
-            data: Dictionary containing user data
-            
-        Returns:
-            A new User instance
-        """
-        # Convert string dates to datetime objects if needed
-        if isinstance(data.get('last_login'), str):
-            data['last_login'] = datetime.fromisoformat(data['last_login'])
-        if isinstance(data.get('created_at'), str):
-            data['created_at'] = datetime.fromisoformat(data['created_at'])
-        if isinstance(data.get('updated_at'), str):
-            data['updated_at'] = datetime.fromisoformat(data['updated_at'])
-            
-        return super(User, cls).from_dict(data)
+        self.created_at = created_at
+        self.updated_at = updated_at
         
     def __str__(self) -> str:
         """
-        Return a string representation of the User.
+        Get string representation of the user.
         
         Returns:
             String representation
         """
-        if self.call_sign:
-            return f"{self.name} ({self.call_sign})"
-        return self.name
+        return f"User(id={self.id}, name='{self.name}', call_sign='{self.call_sign}')"
+        
+    def __repr__(self) -> str:
+        """
+        Get debug representation of the user.
+        
+        Returns:
+            Debug representation
+        """
+        return (f"User(id={self.id}, name='{self.name}', call_sign='{self.call_sign}', "
+                f"last_login={self.last_login}, created_at={self.created_at}, "
+                f"updated_at={self.updated_at})")
+                
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert user to dictionary.
+        
+        Returns:
+            Dictionary representation of the user
+        """
+        return {
+            "id": self.id,
+            "name": self.name,
+            "call_sign": self.call_sign,
+            "last_login": self.last_login,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at
+        }
+        
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'User':
+        """
+        Create a User from a dictionary.
+        
+        Args:
+            data: Dictionary with user data
+            
+        Returns:
+            User object
+        """
+        return cls(
+            id=data.get("id"),
+            name=data.get("name", ""),
+            call_sign=data.get("call_sign"),
+            last_login=data.get("last_login"),
+            created_at=data.get("created_at"),
+            updated_at=data.get("updated_at")
+        )

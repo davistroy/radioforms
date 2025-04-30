@@ -5,19 +5,20 @@
 Attachment Data Access Object (DAO) for database operations related to file attachments.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union, overload
 import os
 import shutil
 from pathlib import Path
-import datetime
+from datetime import datetime
 import mimetypes
 
 from radioforms.database.dao.base_dao import BaseDAO, DAOException
 from radioforms.database.models.attachment import Attachment
 from radioforms.database.db_manager import DatabaseManager
+from radioforms.database.dao.dao_cache_mixin import DAOCacheMixin
 
 
-class AttachmentDAO(BaseDAO[Attachment]):
+class AttachmentDAO(DAOCacheMixin[Attachment], BaseDAO[Attachment]):
     """
     Data Access Object for Attachment entities, providing database operations
     for creating, retrieving, updating, and deleting file attachments.
@@ -31,7 +32,8 @@ class AttachmentDAO(BaseDAO[Attachment]):
             db_manager: Database manager for database operations
             attachment_dir: Directory to store attachments (defaults to 'attachments' in current dir)
         """
-        super().__init__(db_manager)
+        BaseDAO.__init__(self, db_manager)
+        DAOCacheMixin.__init__(self)
         self.table_name = "attachments"
         self.pk_column = "id"
         
@@ -56,7 +58,8 @@ class AttachmentDAO(BaseDAO[Attachment]):
             file_name=row.get('file_name', ''),
             file_type=row.get('file_type', ''),
             file_size=row.get('file_size', 0),
-            created_at=row.get('created_at')
+            created_at=row.get('created_at'),
+            updated_at=row.get('updated_at')
         )
         
     def _entity_to_values(self, entity: Attachment) -> Dict[str, Any]:
@@ -69,13 +72,29 @@ class AttachmentDAO(BaseDAO[Attachment]):
         Returns:
             Dictionary containing column names and values
         """
+        # Ensure both created_at and updated_at are set
+        now = datetime.now()
+        created_at = entity.created_at or now
+        
+        # For updates, always set updated_at to current time
+        # For new entities, use the entity's updated_at or created_at
+        if entity.id is not None:
+            # This is an update operation, set updated_at to current time
+            updated_at = now
+            # Update the entity's updated_at value to maintain consistency
+            entity.updated_at = now
+        else:
+            # This is a new entity, use existing updated_at or created_at
+            updated_at = entity.updated_at or created_at
+        
         values = {
             'form_id': entity.form_id,
             'file_path': entity.file_path,
             'file_name': entity.file_name,
             'file_type': entity.file_type,
             'file_size': entity.file_size,
-            'created_at': entity.created_at
+            'created_at': created_at,
+            'updated_at': updated_at
         }
         
         if entity.id is not None:
@@ -110,7 +129,7 @@ class AttachmentDAO(BaseDAO[Attachment]):
                 file_name = source_path.name
                 
             # Create a unique filename based on timestamp
-            timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
             unique_name = f"{timestamp}_{file_name}"
             
             # Create form-specific subdirectory
@@ -259,7 +278,7 @@ class AttachmentDAO(BaseDAO[Attachment]):
         info['exists'] = file_path.exists()
         
         if info['exists']:
-            info['last_modified'] = datetime.datetime.fromtimestamp(
+            info['last_modified'] = datetime.fromtimestamp(
                 os.path.getmtime(file_path)
             )
             

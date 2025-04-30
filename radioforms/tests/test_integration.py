@@ -114,12 +114,12 @@ class IntegrationTestCase(unittest.TestCase):
         self.assertTrue(self.form_dao.update_with_content(form, updated_content, user.id))
         
         # Step 6: Retrieve the form with its latest content
-        retrieved_form, content = self.form_dao.get_with_content(form.id)
+        retrieved_form, content = self.form_dao.find_with_content(form.id)
         self.assertEqual(retrieved_form.id, form.id)
         self.assertEqual(content["message"], updated_content["message"])
         
         # Step 7: Verify version history
-        versions = self.form_dao.get_all_versions(form.id)
+        versions = self.form_dao.find_all_versions(form.id)
         self.assertEqual(len(versions), 2)  # Initial + update
         
         # Step 8: Verify attachment
@@ -294,14 +294,16 @@ class IntegrationTestCase(unittest.TestCase):
         user = self.user_dao.find_by_call_sign("TX1")
         self.assertIsNotNone(user)
         
-        incident = self.incident_dao.find_by_name("Transaction Incident")[0]
+        incidents = self.incident_dao.find_by_name("Transaction Incident")
+        self.assertEqual(len(incidents), 1)
+        incident = incidents[0]
         self.assertIsNotNone(incident)
         
         form = self.form_dao.find_by_id(form_id)
         self.assertIsNotNone(form)
         
         # Verify form has a version
-        form_with_content = self.form_dao.get_with_content(form_id)
+        form_with_content = self.form_dao.find_with_content(form_id)
         self.assertIsNotNone(form_with_content)
         self.assertEqual(form_with_content[1]["message"], "Transaction content")
         

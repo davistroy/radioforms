@@ -5,15 +5,16 @@
 Setting Data Access Object (DAO) for database operations related to application settings.
 """
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, overload
 from datetime import datetime
 
 from radioforms.database.dao.base_dao import BaseDAO, DAOException
 from radioforms.database.models.setting import Setting
 from radioforms.database.db_manager import DatabaseManager
+from radioforms.database.dao.dao_cache_mixin import DAOCacheMixin
 
 
-class SettingDAO(BaseDAO[Setting]):
+class SettingDAO(DAOCacheMixin[Setting], BaseDAO[Setting]):
     """
     Data Access Object for Setting entities, providing database operations
     for creating, retrieving, updating, and deleting application settings.
@@ -26,7 +27,8 @@ class SettingDAO(BaseDAO[Setting]):
         Args:
             db_manager: Database manager for database operations
         """
-        super().__init__(db_manager)
+        BaseDAO.__init__(self, db_manager)
+        DAOCacheMixin.__init__(self)
         self.table_name = "settings"
         self.pk_column = "id"
         
@@ -70,22 +72,32 @@ class SettingDAO(BaseDAO[Setting]):
             
         return values
         
-    def get_by_key(self, key: str) -> Optional[Setting]:
+    @overload
+    def find_by_key(self, key: str) -> Optional[Setting]:
+        ...
+        
+    @overload
+    def find_by_key(self, key: str, as_dict: bool = False) -> Optional[Dict[str, Any]]:
+        ...
+        
+    def find_by_key(self, key: str, as_dict: bool = False) -> Optional[Union[Setting, Dict[str, Any]]]:
         """
-        Get a setting by its key.
+        Find a setting by its key.
         
         Args:
             key: The setting key
+            as_dict: When True, return a dictionary instead of an entity object
             
         Returns:
-            The setting if found, None otherwise
+            The setting if found (as object or dictionary based on as_dict), None otherwise
         """
         query = f"SELECT * FROM {self.table_name} WHERE key = ?"
         cursor = self.db_manager.execute(query, (key,))
         row = cursor.fetchone()
         
         if row:
-            return self._row_to_entity(dict(row))
+            row_dict = dict(row)
+            return row_dict if as_dict else self._row_to_entity(row_dict)
         return None
         
     def get_value(self, key: str, default: Any = None) -> Any:
@@ -99,7 +111,7 @@ class SettingDAO(BaseDAO[Setting]):
         Returns:
             The setting value if found, default otherwise
         """
-        setting = self.get_by_key(key)
+        setting = self.find_by_key(key)
         if setting:
             return setting.value
         return default
@@ -116,7 +128,7 @@ class SettingDAO(BaseDAO[Setting]):
             The updated or created Setting entity
         """
         # First, check if the setting exists
-        setting = self.get_by_key(key)
+        setting = self.find_by_key(key)
         
         if setting:
             # Update existing setting

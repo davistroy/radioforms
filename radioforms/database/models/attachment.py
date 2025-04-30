@@ -26,7 +26,8 @@ class Attachment(TimestampedModel):
                 file_name: str = "",
                 file_type: str = "",
                 file_size: int = 0,
-                created_at: Optional[datetime] = None):
+                created_at: Optional[datetime] = None,
+                updated_at: Optional[datetime] = None):
         """
         Initialize an Attachment entity.
         
@@ -38,8 +39,9 @@ class Attachment(TimestampedModel):
             file_type: MIME type or file extension
             file_size: Size of the file in bytes
             created_at: Timestamp when the attachment was created
+            updated_at: Timestamp when the attachment was last updated
         """
-        super().__init__(id, created_at, created_at)  # updated_at is same as created_at
+        super().__init__(id, created_at, updated_at or created_at)  # Default updated_at to created_at if not provided
         self.form_id = form_id
         self.file_path = file_path
         self.file_name = file_name
