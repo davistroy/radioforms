@@ -5,7 +5,7 @@
 Form Data Access Object (DAO) for database operations related to forms.
 """
 
-from typing import Any, Dict, List, Optional, Tuple, Union, overload
+from typing import Any, Dict, List, Optional, Tuple, Union
 import json
 from datetime import datetime
 
@@ -82,7 +82,7 @@ class FormDAO(DAOCacheMixin[Form], BaseDAO[Form]):
         return values
         
     def create_with_content(self, form: Union[Form, Dict[str, Any]], content: Union[str, Dict[str, Any]], 
-                          user_id: Optional[int] = None) -> int:
+                           user_id: Optional[int] = None) -> int:
         """
         Create a new form with its initial content version.
         
@@ -93,6 +93,11 @@ class FormDAO(DAOCacheMixin[Form], BaseDAO[Form]):
             
         Returns:
             The ID of the created form
+            
+        Examples:
+            >>> form = Form(form_type="ICS-213", title="Message Form")
+            >>> content = {"to": "Operations", "from": "Planning", "message": "Test"}
+            >>> form_id = form_dao.create_with_content(form, content, user_id=1)
         """
         with self.db_manager.transaction() as tx:
             # Handle form data based on its type
@@ -154,7 +159,7 @@ class FormDAO(DAOCacheMixin[Form], BaseDAO[Form]):
             return form_id
             
     def update_with_content(self, form: Form, content: Union[str, Dict[str, Any]], 
-                          user_id: Optional[int] = None) -> bool:
+                           user_id: Optional[int] = None) -> bool:
         """
         Update a form and create a new content version.
         
@@ -165,6 +170,11 @@ class FormDAO(DAOCacheMixin[Form], BaseDAO[Form]):
             
         Returns:
             True if the form was updated, False otherwise
+            
+        Examples:
+            >>> form = form_dao.find_by_id(5)
+            >>> content = {"to": "Logistics", "from": "Operations", "message": "Updated"}
+            >>> success = form_dao.update_with_content(form, content, user_id=2)
         """
         with self.db_manager.transaction() as tx:
             # Update the form first
@@ -209,20 +219,11 @@ class FormDAO(DAOCacheMixin[Form], BaseDAO[Form]):
             
             return True
             
-    @overload
-    def find_with_content(self, form_id: int, version: Optional[int] = None) -> Optional[Tuple[Form, Dict[str, Any]]]:
-        ...
-        
-    @overload
     def find_with_content(self, form_id: int, version: Optional[int] = None, 
-                        as_dict: bool = False) -> Optional[Tuple[Dict[str, Any], Dict[str, Any]]]:
-        ...
-        
-    def find_with_content(self, form_id: int, version: Optional[int] = None, 
-                        as_dict: bool = False) -> Optional[Union[
-                            Tuple[Form, Dict[str, Any]], 
-                            Tuple[Dict[str, Any], Dict[str, Any]]
-                        ]]:
+                         as_dict: bool = False) -> Optional[Union[
+                             Tuple[Form, Dict[str, Any]], 
+                             Tuple[Dict[str, Any], Dict[str, Any]]
+                         ]]:
         """
         Find a form with its content, optionally at a specific version.
         
@@ -234,6 +235,15 @@ class FormDAO(DAOCacheMixin[Form], BaseDAO[Form]):
         Returns:
             Tuple of (form, content dictionary) if found, None otherwise.
             Form will be entity or dictionary based on as_dict parameter.
+            
+        Examples:
+            >>> form_data = form_dao.find_with_content(5)
+            >>> if form_data:
+            >>>     form, content = form_data
+            >>>     print(f"Form {form.title} content: {content}")
+            >>>
+            >>> # Get specific version as dict
+            >>> form_data = form_dao.find_with_content(5, version=3, as_dict=True)
         """
         # Get the form first
         form = self.find_by_id(form_id, as_dict=as_dict)
@@ -273,7 +283,7 @@ class FormDAO(DAOCacheMixin[Form], BaseDAO[Form]):
             
         return (form, content_dict)
         
-    def find_all_versions(self, form_id: int) -> List[FormVersion]:
+    def find_versions(self, form_id: int) -> List[FormVersion]:
         """
         Find all versions of a form.
         
@@ -282,6 +292,11 @@ class FormDAO(DAOCacheMixin[Form], BaseDAO[Form]):
             
         Returns:
             List of FormVersion entities
+            
+        Examples:
+            >>> versions = form_dao.find_versions(5)
+            >>> for version in versions:
+            >>>     print(f"Version {version.version_number} created at {version.created_at}")
         """
         query = """
             SELECT * FROM form_versions
@@ -305,30 +320,24 @@ class FormDAO(DAOCacheMixin[Form], BaseDAO[Form]):
             
         return versions
         
-    @overload
     def find_by_incident(self, incident_id: int, 
-                       status: Optional[Union[FormStatus, str]] = None) -> List[Form]:
-        ...
-        
-    @overload
-    def find_by_incident(self, incident_id: int, 
-                       status: Optional[Union[FormStatus, str]] = None,
-                       as_dict: bool = False) -> List[Dict[str, Any]]:
-        ...
-        
-    def find_by_incident(self, incident_id: int, 
-                       status: Optional[Union[FormStatus, str]] = None,
-                       as_dict: bool = False) -> Union[List[Form], List[Dict[str, Any]]]:
+                        as_dict: bool = False,
+                        status: Optional[Union[FormStatus, str]] = None) -> Union[List[Form], List[Dict[str, Any]]]:
         """
         Find forms belonging to an incident, optionally filtered by status.
         
         Args:
             incident_id: ID of the incident
-            status: Optional status to filter by
             as_dict: When True, return dictionaries instead of entity objects
+            status: Optional status to filter by
             
         Returns:
-            List of matching forms (as objects or dictionaries based on as_dict)
+            List of matching forms as either entity objects or dictionaries
+            
+        Examples:
+            >>> incident_forms = form_dao.find_by_incident(3)
+            >>> draft_forms = form_dao.find_by_incident(3, status=FormStatus.DRAFT)
+            >>> form_dicts = form_dao.find_by_incident(3, as_dict=True)
         """
         query = f"SELECT * FROM {self.table_name} WHERE incident_id = ?"
         params = [incident_id]
@@ -346,30 +355,24 @@ class FormDAO(DAOCacheMixin[Form], BaseDAO[Form]):
             return [dict(row) for row in rows]
         return [self._row_to_entity(dict(row)) for row in rows]
         
-    @overload
     def find_by_user(self, user_id: int, 
-                   status: Optional[Union[FormStatus, str]] = None) -> List[Form]:
-        ...
-        
-    @overload
-    def find_by_user(self, user_id: int, 
-                   status: Optional[Union[FormStatus, str]] = None,
-                   as_dict: bool = False) -> List[Dict[str, Any]]:
-        ...
-        
-    def find_by_user(self, user_id: int, 
-                   status: Optional[Union[FormStatus, str]] = None,
-                   as_dict: bool = False) -> Union[List[Form], List[Dict[str, Any]]]:
+                    as_dict: bool = False,
+                    status: Optional[Union[FormStatus, str]] = None) -> Union[List[Form], List[Dict[str, Any]]]:
         """
         Find forms created by a user, optionally filtered by status.
         
         Args:
             user_id: ID of the creator
-            status: Optional status to filter by
             as_dict: When True, return dictionaries instead of entity objects
+            status: Optional status to filter by
             
         Returns:
-            List of matching forms (as objects or dictionaries based on as_dict)
+            List of matching forms as either entity objects or dictionaries
+            
+        Examples:
+            >>> user_forms = form_dao.find_by_user(2)
+            >>> submitted_forms = form_dao.find_by_user(2, status="submitted")
+            >>> form_dicts = form_dao.find_by_user(2, as_dict=True)
         """
         query = f"SELECT * FROM {self.table_name} WHERE creator_id = ?"
         params = [user_id]
@@ -387,30 +390,24 @@ class FormDAO(DAOCacheMixin[Form], BaseDAO[Form]):
             return [dict(row) for row in rows]
         return [self._row_to_entity(dict(row)) for row in rows]
         
-    @overload
     def find_by_type(self, form_type: str, 
-                   status: Optional[Union[FormStatus, str]] = None) -> List[Form]:
-        ...
-        
-    @overload
-    def find_by_type(self, form_type: str, 
-                   status: Optional[Union[FormStatus, str]] = None,
-                   as_dict: bool = False) -> List[Dict[str, Any]]:
-        ...
-        
-    def find_by_type(self, form_type: str, 
-                   status: Optional[Union[FormStatus, str]] = None,
-                   as_dict: bool = False) -> Union[List[Form], List[Dict[str, Any]]]:
+                    as_dict: bool = False,
+                    status: Optional[Union[FormStatus, str]] = None) -> Union[List[Form], List[Dict[str, Any]]]:
         """
         Find forms of a specific type, optionally filtered by status.
         
         Args:
             form_type: Type of form (e.g., 'ICS-213')
-            status: Optional status to filter by
             as_dict: When True, return dictionaries instead of entity objects
+            status: Optional status to filter by
             
         Returns:
-            List of matching forms (as objects or dictionaries based on as_dict)
+            List of matching forms as either entity objects or dictionaries
+            
+        Examples:
+            >>> ics213_forms = form_dao.find_by_type('ICS-213')
+            >>> finalized_ics213 = form_dao.find_by_type('ICS-213', status=FormStatus.FINALIZED)
+            >>> form_dicts = form_dao.find_by_type('ICS-214', as_dict=True)
         """
         query = f"SELECT * FROM {self.table_name} WHERE form_type = ?"
         params = [form_type]
@@ -428,10 +425,10 @@ class FormDAO(DAOCacheMixin[Form], BaseDAO[Form]):
             return [dict(row) for row in rows]
         return [self._row_to_entity(dict(row)) for row in rows]
         
-    def search_forms(self, search_term: str, incident_id: Optional[int] = None, 
-                   form_type: Optional[str] = None) -> List[Form]:
+    def search(self, search_term: str, incident_id: Optional[int] = None, 
+              form_type: Optional[str] = None) -> List[Form]:
         """
-        Search for forms by title or content, with optional filtering by incident or form type.
+        Search for forms by title or content, with optional filtering.
         
         Args:
             search_term: Term to search for in title and content
@@ -440,6 +437,11 @@ class FormDAO(DAOCacheMixin[Form], BaseDAO[Form]):
             
         Returns:
             List of matching forms
+            
+        Examples:
+            >>> results = form_dao.search("evacuation")
+            >>> incident_results = form_dao.search("supplies", incident_id=3)
+            >>> ics213_results = form_dao.search("urgent", form_type='ICS-213')
         """
         # Build base query with title search
         query = f"""
@@ -463,7 +465,7 @@ class FormDAO(DAOCacheMixin[Form], BaseDAO[Form]):
         
         return [self._row_to_entity(dict(row)) for row in cursor.fetchall()]
         
-    def delete_with_versions(self, form_id: int) -> bool:
+    def delete_cascade(self, form_id: int) -> bool:
         """
         Delete a form and all its versions and attachments.
         
@@ -472,6 +474,11 @@ class FormDAO(DAOCacheMixin[Form], BaseDAO[Form]):
             
         Returns:
             True if the form was deleted, False otherwise
+            
+        Example:
+            >>> success = form_dao.delete_cascade(5)
+            >>> if success:
+            >>>     print("Form and all related data deleted successfully")
         """
         with self.db_manager.transaction() as tx:
             # Delete attachments first (to satisfy foreign key constraints)
@@ -488,7 +495,7 @@ class FormDAO(DAOCacheMixin[Form], BaseDAO[Form]):
             
             return cursor.rowcount > 0
             
-    def update_status(self, form_id: int, status: Union[FormStatus, str]) -> bool:
+    def set_form_status(self, form_id: int, status: Union[FormStatus, str]) -> bool:
         """
         Update a form's status.
         
@@ -498,6 +505,10 @@ class FormDAO(DAOCacheMixin[Form], BaseDAO[Form]):
             
         Returns:
             True if the form was updated, False otherwise
+            
+        Examples:
+            >>> form_dao.set_form_status(5, FormStatus.FINALIZED)
+            >>> form_dao.set_form_status(6, "submitted")
         """
         status_str = status if isinstance(status, str) else str(status)
         now = datetime.now()
@@ -511,16 +522,23 @@ class FormDAO(DAOCacheMixin[Form], BaseDAO[Form]):
         # This will also handle cache invalidation
         return self.update(form_id, update_data)
         
-    def find_recent_forms(self, limit: int = 10, incident_id: Optional[int] = None) -> List[Form]:
+    def find_recent(self, as_dict: bool = False, limit: int = 10, 
+                   incident_id: Optional[int] = None) -> Union[List[Form], List[Dict[str, Any]]]:
         """
         Find recently updated forms.
         
         Args:
+            as_dict: When True, return dictionaries instead of entity objects
             limit: Maximum number of forms to return
             incident_id: Optional incident ID to filter by
             
         Returns:
-            List of recent forms
+            List of recent forms as either entity objects or dictionaries
+            
+        Examples:
+            >>> recent_forms = form_dao.find_recent(limit=5)
+            >>> incident_forms = form_dao.find_recent(incident_id=3)
+            >>> form_dicts = form_dao.find_recent(as_dict=True)
         """
         query = f"SELECT * FROM {self.table_name}"
         params = []
@@ -533,5 +551,8 @@ class FormDAO(DAOCacheMixin[Form], BaseDAO[Form]):
         params.append(limit)
         
         cursor = self.db_manager.execute(query, params)
+        rows = cursor.fetchall()
         
-        return [self._row_to_entity(dict(row)) for row in cursor.fetchall()]
+        if as_dict:
+            return [dict(row) for row in rows]
+        return [self._row_to_entity(dict(row)) for row in rows]

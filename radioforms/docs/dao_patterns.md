@@ -8,6 +8,7 @@ The Data Access Object (DAO) pattern is a structural pattern that isolates the a
 - Consistent interface for data access across the application
 - Support for both object-oriented and dictionary-based data access
 - Type safety through Python type hints
+- Standardized method naming conventions
 
 This document explains the DAO architecture used in RadioForms and provides guidance for using and extending it.
 
@@ -77,11 +78,25 @@ This ensures proper type checking and IDE auto-completion regardless of which st
 
 ### 3. Consistent Naming Conventions
 
-DAO methods follow consistent naming conventions:
-- `find_*`: Methods that retrieve data from the database
-- `create_*`: Methods that insert new data
-- `update_*`: Methods that modify existing data
-- `delete_*`: Methods that remove data
+All DAO methods follow standardized naming conventions:
+
+- `find_*`: Methods that retrieve data without modifying it
+  - Examples: `find_by_id`, `find_all`, `find_active`, `find_by_user`
+  
+- `set_*`: Methods that modify a specific property or state
+  - Examples: `set_form_status`, `set_incident_closed`, `set_value`
+  
+- `create_*`: Methods that create new entities
+  - Examples: `create`, `create_with_content`, `create_from_file`
+  
+- `update_*`: Methods that update existing entities
+  - Examples: `update`, `update_with_content`
+  
+- `delete_*`: Methods that remove entities
+  - Examples: `delete`, `delete_cascade`
+  
+- `move_*`: Methods that change relationships between entities
+  - Examples: `move_to_form`
 
 ## Usage Guidelines
 
@@ -117,9 +132,9 @@ Each DAO provides entity-specific methods for common operations:
 
 ```python
 # IncidentDAO specific methods
-active_incidents = incident_dao.find_active_incidents()
-incident_dao.close_incident(incident_id)
-incident_dao.reopen_incident(incident_id)
+active_incidents = incident_dao.find_active()
+incident_dao.set_incident_closed(incident_id)
+incident_dao.set_incident_active(incident_id)
 
 # FormDAO specific methods
 forms = form_dao.find_by_incident(incident_id)
@@ -155,6 +170,7 @@ When adding new entity types or methods:
 4. Add specialized methods as needed
 5. Follow the dual interface pattern with `as_dict` parameters
 6. Add comprehensive docstrings with examples
+7. Ensure all method names follow the standardized naming conventions
 
 ## Examples
 
@@ -162,7 +178,7 @@ When adding new entity types or methods:
 
 ```python
 # Working with incident entities
-incidents = incident_dao.find_active_incidents()
+incidents = incident_dao.find_active()
 for incident in incidents:
     if incident.is_active():
         # Access properties directly
@@ -170,14 +186,14 @@ for incident in incidents:
         
         # Update the incident
         if some_condition:
-            incident_dao.close_incident(incident.id)
+            incident_dao.set_incident_closed(incident.id)
 ```
 
 ### Dictionary-Oriented Usage
 
 ```python
 # Working with incident dictionaries
-incidents = incident_dao.find_active_incidents(as_dict=True)
+incidents = incident_dao.find_active(as_dict=True)
 for incident in incidents:
     # Access dictionary keys
     print(f"Active incident: {incident['name']} (started: {incident['start_date']})")
@@ -194,3 +210,4 @@ for incident in incidents:
 3. Use entity objects for business logic, dictionaries for data transfer
 4. Leverage specialized query methods instead of retrieving all entities and filtering
 5. Write comprehensive tests for DAO classes and methods
+6. Follow the standardized method naming conventions to ensure consistency

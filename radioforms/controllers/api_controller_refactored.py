@@ -16,11 +16,11 @@ import json
 from PySide6.QtCore import QObject, Signal, Slot
 
 from radioforms.database.db_manager import DatabaseManager
-from radioforms.database.dao.incident_dao import IncidentDAO
-from radioforms.database.dao.form_dao import FormDAO
-from radioforms.database.dao.user_dao import UserDAO
-from radioforms.database.dao.attachment_dao import AttachmentDAO
-from radioforms.database.dao.setting_dao import SettingDAO
+from radioforms.database.dao.incident_dao_refactored import IncidentDAO
+from radioforms.database.dao.form_dao_refactored import FormDAO
+from radioforms.database.dao.user_dao_refactored import UserDAO
+from radioforms.database.dao.attachment_dao_refactored import AttachmentDAO
+from radioforms.database.dao.setting_dao_refactored import SettingDAO
 from radioforms.database.models.form import FormStatus
 
 

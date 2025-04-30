@@ -5,7 +5,7 @@
 Attachment Data Access Object (DAO) for database operations related to file attachments.
 """
 
-from typing import Any, Dict, List, Optional, Tuple, Union, overload
+from typing import Any, Dict, List, Optional, Tuple, Union
 import os
 import shutil
 from pathlib import Path
@@ -117,6 +117,10 @@ class AttachmentDAO(DAOCacheMixin[Attachment], BaseDAO[Attachment]):
         Returns:
             The created Attachment entity
             
+        Examples:
+            >>> attachment = attachment_dao.create_from_file(5, "/path/to/report.pdf")
+            >>> attachment = attachment_dao.create_from_file(3, "my_file.txt", "renamed.txt")
+            
         Raises:
             DAOException: If the file cannot be copied or created
         """
@@ -179,6 +183,11 @@ class AttachmentDAO(DAOCacheMixin[Attachment], BaseDAO[Attachment]):
             
         Returns:
             True if the attachment was deleted, False otherwise
+            
+        Examples:
+            >>> success = attachment_dao.delete_with_file(5)
+            >>> if success:
+            >>>     print("Attachment #5 and its file were deleted")
         """
         # Get the attachment first to get the file path
         attachment = self.find_by_id(attachment_id)
@@ -196,22 +205,30 @@ class AttachmentDAO(DAOCacheMixin[Attachment], BaseDAO[Attachment]):
         # Delete from database
         return self.delete(attachment_id)
         
-    def find_by_form(self, form_id: int) -> List[Attachment]:
+    def find_by_form(self, form_id: int, as_dict: bool = False) -> Union[List[Attachment], List[Dict[str, Any]]]:
         """
         Find all attachments for a specific form.
         
         Args:
             form_id: ID of the form
+            as_dict: When True, return dictionaries instead of entity objects
             
         Returns:
-            List of attachments
+            List of attachments as either entity objects or dictionaries
+            
+        Examples:
+            >>> attachments = attachment_dao.find_by_form(5)
+            >>> attachment_dicts = attachment_dao.find_by_form(5, as_dict=True)
         """
         query = f"SELECT * FROM {self.table_name} WHERE form_id = ?"
         cursor = self.db_manager.execute(query, (form_id,))
+        rows = cursor.fetchall()
         
-        return [self._row_to_entity(dict(row)) for row in cursor.fetchall()]
+        if as_dict:
+            return [dict(row) for row in rows]
+        return [self._row_to_entity(dict(row)) for row in rows]
         
-    def move_attachments(self, from_form_id: int, to_form_id: int) -> int:
+    def move_to_form(self, from_form_id: int, to_form_id: int) -> int:
         """
         Move attachments from one form to another.
         
@@ -221,6 +238,10 @@ class AttachmentDAO(DAOCacheMixin[Attachment], BaseDAO[Attachment]):
             
         Returns:
             Number of attachments moved
+            
+        Examples:
+            >>> moved_count = attachment_dao.move_to_form(5, 8)
+            >>> print(f"Moved {moved_count} attachments to form #8")
         """
         # Get the attachments for the source form
         attachments = self.find_by_form(from_form_id)
@@ -257,7 +278,7 @@ class AttachmentDAO(DAOCacheMixin[Attachment], BaseDAO[Attachment]):
                 
         return moved_count
         
-    def get_attachment_info(self, attachment_id: int) -> Optional[Dict[str, Any]]:
+    def find_attachment_info(self, attachment_id: int) -> Optional[Dict[str, Any]]:
         """
         Get detailed information about an attachment.
         
@@ -266,6 +287,11 @@ class AttachmentDAO(DAOCacheMixin[Attachment], BaseDAO[Attachment]):
             
         Returns:
             Dictionary with attachment details, or None if not found
+            
+        Examples:
+            >>> info = attachment_dao.find_attachment_info(5)
+            >>> if info:
+            >>>     print(f"File: {info['file_name']}, Size: {info['file_size']}")
         """
         attachment = self.find_by_id(attachment_id)
         if not attachment:
@@ -287,7 +313,7 @@ class AttachmentDAO(DAOCacheMixin[Attachment], BaseDAO[Attachment]):
         
         return info
         
-    def export_attachment(self, attachment_id: int, export_path: str) -> bool:
+    def export_to_path(self, attachment_id: int, export_path: str) -> bool:
         """
         Export (copy) an attachment to a specified location.
         
@@ -297,6 +323,10 @@ class AttachmentDAO(DAOCacheMixin[Attachment], BaseDAO[Attachment]):
             
         Returns:
             True if the attachment was exported successfully, False otherwise
+            
+        Examples:
+            >>> success = attachment_dao.export_to_path(5, "/path/to/export/file.pdf")
+            >>> success = attachment_dao.export_to_path(5, "/export/directory")
         """
         attachment = self.find_by_id(attachment_id)
         if not attachment:
