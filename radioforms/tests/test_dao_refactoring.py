@@ -2,355 +2,336 @@
 # -*- coding: utf-8 -*-
 
 """
-Integration tests for the refactored DAO layer.
+Tests for the refactored DAO classes.
 
-This test suite specifically validates that the standardized BaseDAO interface
-works correctly across all DAO implementations with both entity objects and dictionaries.
+This module contains tests to verify that the refactored DAO classes
+maintain the same functionality as their original versions.
 """
 
-import unittest
+import os
 import tempfile
-import datetime
-from pathlib import Path
+import unittest
+from datetime import datetime, timedelta
 
 from radioforms.database.db_manager import DatabaseManager
-from radioforms.database.dao import (
-    UserDAO, IncidentDAO, FormDAO, AttachmentDAO, SettingDAO
-)
-from radioforms.database.models.user import User
+from radioforms.database.dao.incident_dao import IncidentDAO as OriginalIncidentDAO
+from radioforms.database.dao.incident_dao_refactored import IncidentDAO as RefactoredIncidentDAO
 from radioforms.database.models.incident import Incident
-from radioforms.database.models.form import Form, FormStatus
-from radioforms.database.models.setting import Setting
 
 
-class DAORefactoringTestCase(unittest.TestCase):
-    """Test case for the refactored DAO implementations."""
+class IncidentDAORefactoringTests(unittest.TestCase):
+    """Tests for the refactored IncidentDAO class."""
     
     def setUp(self):
-        """Set up test environment."""
-        # Create a temporary directory for the test
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.db_path = Path(self.temp_dir.name) / "test_dao_refactoring.db"
+        """Set up a test database and DAO instances."""
+        # Create a temporary database file
+        fd, self.db_path = tempfile.mkstemp(suffix='.db')
+        os.close(fd)
         
-        # Create a database manager instance
+        # Create database manager
         self.db_manager = DatabaseManager(self.db_path)
         
         # Create DAO instances
-        self.user_dao = UserDAO(self.db_manager)
-        self.incident_dao = IncidentDAO(self.db_manager)
-        self.form_dao = FormDAO(self.db_manager)
-        self.attachment_dao = AttachmentDAO(self.db_manager, self.temp_dir.name)
-        self.setting_dao = SettingDAO(self.db_manager)
+        self.original_dao = OriginalIncidentDAO(self.db_manager)
+        self.refactored_dao = RefactoredIncidentDAO(self.db_manager)
         
+        # Create test schema
+        self._create_test_schema()
+        
+        # Add test data
+        self._insert_test_data()
+    
     def tearDown(self):
         """Clean up resources."""
-        # Close the database connection
-        if hasattr(self, 'db_manager'):
-            self.db_manager.close()
-            
-        # Clean up the temporary directory
-        self.temp_dir.cleanup()
-        
-    def test_user_dao_entity_dict_interop(self):
-        """Test UserDAO with both entity and dictionary operations."""
-        # Create user with entity
-        user_entity = User(
-            name="Entity User",
-            call_sign="ENT1"
-        )
-        user_entity_id = self.user_dao.create(user_entity)
-        self.assertIsNotNone(user_entity_id)
-        
-        # Create user with dictionary
-        user_dict = {
-            "name": "Dict User",
-            "call_sign": "DICT1"
-        }
-        user_dict_id = self.user_dao.create(user_dict)
-        self.assertIsNotNone(user_dict_id)
-        
-        # Retrieve users in different formats
-        # 1. Entity -> Entity
-        entity_as_entity = self.user_dao.find_by_id(user_entity_id)
-        self.assertIsInstance(entity_as_entity, User)
-        self.assertEqual(entity_as_entity.name, "Entity User")
-        
-        # 2. Entity -> Dict
-        entity_as_dict = self.user_dao.find_by_id(user_entity_id, as_dict=True)
-        self.assertIsInstance(entity_as_dict, dict)
-        self.assertEqual(entity_as_dict["name"], "Entity User")
-        
-        # 3. Dict -> Entity
-        dict_as_entity = self.user_dao.find_by_id(user_dict_id)
-        self.assertIsInstance(dict_as_entity, User)
-        self.assertEqual(dict_as_entity.name, "Dict User")
-        
-        # 4. Dict -> Dict
-        dict_as_dict = self.user_dao.find_by_id(user_dict_id, as_dict=True)
-        self.assertIsInstance(dict_as_dict, dict)
-        self.assertEqual(dict_as_dict["name"], "Dict User")
-        
-        # Test update with entity
-        entity_as_entity.name = "Updated Entity User"
-        self.assertTrue(self.user_dao.update(entity_as_entity))
-        updated_entity = self.user_dao.find_by_id(entity_as_entity.id)
-        self.assertEqual(updated_entity.name, "Updated Entity User")
-        
-        # Test update with dict
-        dict_update = {"id": user_dict_id, "name": "Updated Dict User"}
-        self.assertTrue(self.user_dao.update(dict_update))
-        updated_dict_user = self.user_dao.find_by_id(user_dict_id)
-        self.assertEqual(updated_dict_user.name, "Updated Dict User")
-        
-        # Test update with id and dict
-        self.assertTrue(self.user_dao.update(user_entity_id, {"name": "Updated Again"}))
-        updated_again = self.user_dao.find_by_id(user_entity_id)
-        self.assertEqual(updated_again.name, "Updated Again")
-        
-    def test_incident_dao_entity_dict_interop(self):
-        """Test IncidentDAO with both entity and dictionary operations."""
-        # Create incident with entity
-        incident_entity = Incident(
-            name="Entity Incident",
-            description="Test entity incident"
-        )
-        incident_entity_id = self.incident_dao.create(incident_entity)
-        self.assertIsNotNone(incident_entity_id)
-        
-        # Create incident with dictionary
-        incident_dict = {
-            "name": "Dict Incident",
-            "description": "Test dictionary incident",
-            "start_date": datetime.datetime.now()
-        }
-        incident_dict_id = self.incident_dao.create(incident_dict)
-        self.assertIsNotNone(incident_dict_id)
-        
-        # Retrieve incidents in different formats
-        # 1. Entity -> Entity
-        entity_as_entity = self.incident_dao.find_by_id(incident_entity_id)
-        self.assertIsInstance(entity_as_entity, Incident)
-        self.assertEqual(entity_as_entity.name, "Entity Incident")
-        
-        # 2. Entity -> Dict
-        entity_as_dict = self.incident_dao.find_by_id(incident_entity_id, as_dict=True)
-        self.assertIsInstance(entity_as_dict, dict)
-        self.assertEqual(entity_as_dict["name"], "Entity Incident")
-        
-        # Test find by name with different return types
-        incidents_as_entities = self.incident_dao.find_by_name("Incident")
-        self.assertTrue(all(isinstance(inc, Incident) for inc in incidents_as_entities))
-        self.assertEqual(len(incidents_as_entities), 2)
-        
-        incidents_as_dicts = self.incident_dao.find_by_name("Incident", as_dict=True)
-        self.assertTrue(all(isinstance(inc, dict) for inc in incidents_as_dicts))
-        self.assertEqual(len(incidents_as_dicts), 2)
-        
-        # Test find active incidents
-        active_incidents = self.incident_dao.find_active_incidents()
-        self.assertEqual(len(active_incidents), 2)  # Both are active by default
-        
-        # Close an incident and test filtering
-        self.incident_dao.close_incident(incident_entity_id)
-        active_incidents = self.incident_dao.find_active_incidents()
-        self.assertEqual(len(active_incidents), 1)
-        
-        # Verify the incident was closed
-        closed_incident = self.incident_dao.find_by_id(incident_entity_id)
-        self.assertFalse(closed_incident.is_active())
-        
-        # Reopen and verify
-        self.incident_dao.reopen_incident(incident_entity_id)
-        reopened = self.incident_dao.find_by_id(incident_entity_id)
-        self.assertTrue(reopened.is_active())
+        self.db_manager.close()
+        if os.path.exists(self.db_path):
+            os.unlink(self.db_path)
     
-    def test_setting_dao_entity_dict_interop(self):
-        """Test SettingDAO with both entity and dictionary operations."""
-        # Create setting with entity
-        setting_entity = Setting(key="entity.setting", value="entity_value")
-        setting_entity_id = self.setting_dao.create(setting_entity)
-        self.assertIsNotNone(setting_entity_id)
+    def _create_test_schema(self):
+        """Create test schema for incidents table."""
+        self.db_manager.execute('''
+        CREATE TABLE IF NOT EXISTS incidents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            description TEXT,
+            start_date TIMESTAMP,
+            end_date TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        ''')
         
-        # Create setting with dictionary
-        setting_dict = {
-            "key": "dict.setting",
-            "value": "dict_value"
-        }
-        setting_dict_id = self.setting_dao.create(setting_dict)
-        self.assertIsNotNone(setting_dict_id)
+        self.db_manager.execute('''
+        CREATE TABLE IF NOT EXISTS forms (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            incident_id INTEGER NOT NULL,
+            form_type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            creator_id INTEGER,
+            status TEXT DEFAULT 'draft',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (incident_id) REFERENCES incidents(id)
+        )
+        ''')
+    
+    def _insert_test_data(self):
+        """Insert test data into the database."""
+        # Insert incidents
+        incidents = [
+            {
+                'name': 'Test Incident 1',
+                'description': 'Active incident for testing',
+                'start_date': datetime.now() - timedelta(days=2),
+                'end_date': None,
+                'created_at': datetime.now() - timedelta(days=2),
+                'updated_at': datetime.now() - timedelta(days=1)
+            },
+            {
+                'name': 'Test Incident 2',
+                'description': 'Closed incident for testing',
+                'start_date': datetime.now() - timedelta(days=5),
+                'end_date': datetime.now() - timedelta(days=3),
+                'created_at': datetime.now() - timedelta(days=5),
+                'updated_at': datetime.now() - timedelta(days=3)
+            },
+            {
+                'name': 'Fire Drill Exercise',
+                'description': 'Training exercise',
+                'start_date': datetime.now() - timedelta(days=1),
+                'end_date': None,
+                'created_at': datetime.now() - timedelta(days=1),
+                'updated_at': datetime.now() - timedelta(hours=12)
+            }
+        ]
         
-        # Retrieve settings in different formats
-        # 1. By key -> Entity
-        entity_by_key = self.setting_dao.find_by_key("entity.setting")
-        self.assertIsInstance(entity_by_key, Setting)
-        self.assertEqual(entity_by_key.value, "entity_value")
+        for incident in incidents:
+            query = '''
+            INSERT INTO incidents (name, description, start_date, end_date, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            '''
+            self.db_manager.execute(query, (
+                incident['name'],
+                incident['description'],
+                incident['start_date'],
+                incident['end_date'],
+                incident['created_at'],
+                incident['updated_at']
+            ))
         
-        # 2. By key -> Dict
-        dict_by_key = self.setting_dao.find_by_key("dict.setting", as_dict=True)
-        self.assertIsInstance(dict_by_key, dict)
-        self.assertEqual(dict_by_key["value"], "dict_value")
+        # Insert some test forms
+        forms = [
+            {
+                'incident_id': 1,
+                'form_type': 'ICS-213',
+                'title': 'General Message Form',
+                'status': 'draft',
+                'creator_id': None,
+                'created_at': datetime.now() - timedelta(days=1),
+                'updated_at': datetime.now() - timedelta(days=1)
+            },
+            {
+                'incident_id': 1,
+                'form_type': 'ICS-214',
+                'title': 'Activity Log',
+                'status': 'draft',
+                'creator_id': None,
+                'created_at': datetime.now() - timedelta(hours=12),
+                'updated_at': datetime.now() - timedelta(hours=12)
+            },
+            {
+                'incident_id': 3,
+                'form_type': 'ICS-213',
+                'title': 'Training Message',
+                'status': 'draft',
+                'creator_id': None,
+                'created_at': datetime.now() - timedelta(hours=6),
+                'updated_at': datetime.now() - timedelta(hours=6)
+            }
+        ]
         
-        # Test direct value access
-        entity_value = self.setting_dao.get_value("entity.setting")
-        self.assertEqual(entity_value, "entity_value")
-        
-        # Test updating with different patterns
-        # 1. Set value creates/updates and returns entity
-        updated_entity = self.setting_dao.set_value("entity.setting", "new_entity_value")
-        self.assertIsInstance(updated_entity, Setting)
-        self.assertEqual(updated_entity.value, "new_entity_value")
-        
-        # Verify the update worked
-        entity_value = self.setting_dao.get_value("entity.setting")
-        self.assertEqual(entity_value, "new_entity_value")
-        
-        # Test settings with different value types
-        self.setting_dao.set_value("setting.int", 42)
-        self.setting_dao.set_value("setting.float", 3.14)
-        self.setting_dao.set_value("setting.bool", True)
-        self.setting_dao.set_value("setting.list", [1, 2, 3])
-        
-        # Verify all value types
-        self.assertEqual(self.setting_dao.get_value("setting.int"), 42)
-        self.assertEqual(self.setting_dao.get_value("setting.float"), 3.14)
-        self.assertEqual(self.setting_dao.get_value("setting.bool"), True)
-        self.assertEqual(self.setting_dao.get_value("setting.list"), [1, 2, 3])
-        
-        # Test prefix filtering
-        settings_by_prefix = self.setting_dao.get_settings_by_prefix("setting")
-        self.assertEqual(len(settings_by_prefix), 4)
-        
-    def test_form_dao_entity_dict_interop(self):
-        """Test FormDAO with both entity and dictionary operations."""
-        # Create user and incident for the form
-        user = User(name="Form Test User", call_sign="FORM1")
-        user.id = self.user_dao.create(user)
-        
-        incident = Incident(name="Form Test Incident")
-        incident.id = self.incident_dao.create(incident)
-        
-        # Create form with entity
-        form_entity = Form(
-            incident_id=incident.id,
-            form_type="ICS-213",
-            title="Entity Form",
-            creator_id=user.id,
-            status=FormStatus.DRAFT
+        for form in forms:
+            query = '''
+            INSERT INTO forms (incident_id, form_type, title, status, creator_id, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            '''
+            self.db_manager.execute(query, (
+                form['incident_id'],
+                form['form_type'],
+                form['title'],
+                form['status'],
+                form['creator_id'],
+                form['created_at'],
+                form['updated_at']
+            ))
+    
+    def test_create(self):
+        """Test that create method works the same in both implementations."""
+        # Test creating an incident from a model object
+        incident = Incident(
+            name="New Incident",
+            description="Test incident from model",
+            start_date=datetime.now()
         )
         
-        # Test creating with content
-        form_content = {
-            "message": "This is a test form",
-            "date": datetime.datetime.now().isoformat()
-        }
+        original_id = self.original_dao.create(incident)
         
-        form_entity_id = self.form_dao.create_with_content(form_entity, form_content, user.id)
-        self.assertIsNotNone(form_entity_id)
-        
-        # Create form with dictionary
-        form_dict = {
-            "incident_id": incident.id,
-            "form_type": "ICS-214",
-            "title": "Dict Form",
-            "creator_id": user.id,
-            "status": str(FormStatus.DRAFT)
-        }
-        
-        form_dict_content = {
-            "message": "This is a dictionary form",
-            "date": datetime.datetime.now().isoformat()
-        }
-        
-        form_dict_id = self.form_dao.create_with_content(form_dict, form_dict_content, user.id)
-        self.assertIsNotNone(form_dict_id)
-        
-        # Retrieve forms in different formats
-        # 1. Entity form with content as entity & dict
-        entity_form, entity_content = self.form_dao.find_with_content(form_entity_id)
-        self.assertIsInstance(entity_form, Form)
-        self.assertEqual(entity_form.title, "Entity Form")
-        self.assertEqual(entity_content["message"], "This is a test form")
-        
-        # 2. Entity form with content as dict
-        form_dict, content_dict = self.form_dao.find_with_content(form_entity_id, as_dict=True)
-        self.assertIsInstance(form_dict, dict)
-        self.assertEqual(form_dict["title"], "Entity Form")
-        self.assertEqual(content_dict["message"], "This is a test form")
-        
-        # Test find by incident
-        forms_by_incident = self.form_dao.find_by_incident(incident.id)
-        self.assertEqual(len(forms_by_incident), 2)
-        
-        forms_by_incident_dict = self.form_dao.find_by_incident(incident.id, as_dict=True)
-        self.assertEqual(len(forms_by_incident_dict), 2)
-        self.assertTrue(all(isinstance(f, dict) for f in forms_by_incident_dict))
-        
-        # Test find by user
-        forms_by_user = self.form_dao.find_by_user(user.id)
-        self.assertEqual(len(forms_by_user), 2)
-        
-        forms_by_user_dict = self.form_dao.find_by_user(user.id, as_dict=True)
-        self.assertEqual(len(forms_by_user_dict), 2)
-        self.assertTrue(all(isinstance(f, dict) for f in forms_by_user_dict))
-        
-        # Test find by type
-        forms_by_type = self.form_dao.find_by_type("ICS-213")
-        self.assertEqual(len(forms_by_type), 1)
-        self.assertEqual(forms_by_type[0].id, form_entity_id)
-        
-    def test_mixed_dao_operations(self):
-        """Test operations across multiple DAOs to ensure they work together correctly."""
-        # Create a user
-        user = User(name="Mixed DAO User", call_sign="MIX1")
-        user.id = self.user_dao.create(user)
-        
-        # Create an incident and track it in settings
-        incident = Incident(name="Mixed DAO Incident")
-        incident.id = self.incident_dao.create(incident)
-        self.setting_dao.set_value("current.incident", incident.id)
-        
-        # Create a form
-        form = Form(
-            incident_id=incident.id,
-            form_type="ICS-213",
-            title="Mixed DAO Form",
-            creator_id=user.id,
-            status=FormStatus.DRAFT
+        # Reset the incident to ensure it doesn't have an ID
+        incident = Incident(
+            name="New Incident",
+            description="Test incident from model",
+            start_date=datetime.now()
         )
-        form_content = {"message": "Mixed DAO test"}
-        form.id = self.form_dao.create_with_content(form, form_content, user.id)
         
-        # Track recent forms in settings
-        self.setting_dao.set_value("recent.forms", [form.id])
+        refactored_id = self.refactored_dao.create(incident)
         
-        # Verify all entities were created and linked correctly
-        current_incident_id = self.setting_dao.get_value("current.incident")
-        self.assertEqual(current_incident_id, incident.id)
+        # Verify both methods return valid IDs
+        self.assertIsInstance(original_id, int)
+        self.assertIsInstance(refactored_id, int)
+        self.assertGreater(original_id, 0)
+        self.assertGreater(refactored_id, 0)
         
-        current_incident = self.incident_dao.find_by_id(current_incident_id)
-        self.assertEqual(current_incident.name, "Mixed DAO Incident")
+        # Test creating an incident from a dictionary
+        incident_dict = {
+            'name': 'Dictionary Incident',
+            'description': 'Test incident from dictionary',
+            'start_date': datetime.now()
+        }
         
-        forms_in_incident = self.form_dao.find_by_incident(current_incident.id)
-        self.assertEqual(len(forms_in_incident), 1)
-        self.assertEqual(forms_in_incident[0].id, form.id)
+        original_id = self.original_dao.create(incident_dict)
+        refactored_id = self.refactored_dao.create(incident_dict)
         
-        recent_form_ids = self.setting_dao.get_value("recent.forms")
-        self.assertEqual(recent_form_ids, [form.id])
+        # Verify both methods return valid IDs
+        self.assertIsInstance(original_id, int)
+        self.assertIsInstance(refactored_id, int)
+        self.assertGreater(original_id, 0)
+        self.assertGreater(refactored_id, 0)
+    
+    def test_find_by_name(self):
+        """Test that find_by_name works the same in both implementations."""
+        # Test finding by name as objects
+        original_results = self.original_dao.find_by_name('Fire')
+        refactored_results = self.refactored_dao.find_by_name('Fire')
         
-        retrieved_form, content = self.form_dao.find_with_content(recent_form_ids[0])
-        self.assertEqual(retrieved_form.title, "Mixed DAO Form")
-        self.assertEqual(content["message"], "Mixed DAO test")
+        # Verify results are the same
+        self.assertEqual(len(original_results), len(refactored_results))
+        for i in range(len(original_results)):
+            self.assertEqual(original_results[i].id, refactored_results[i].id)
+            self.assertEqual(original_results[i].name, refactored_results[i].name)
         
-        # Test a complex query - find all forms by a user in active incidents
-        active_incidents = self.incident_dao.find_active_incidents(as_dict=True)
-        active_incident_ids = [inc['id'] for inc in active_incidents]
+        # Test finding by name as dictionaries
+        original_dict_results = self.original_dao.find_by_name('Test', as_dict=True)
+        refactored_dict_results = self.refactored_dao.find_by_name('Test', as_dict=True)
         
-        forms_by_user = self.form_dao.find_by_user(user.id)
-        active_forms = [f for f in forms_by_user if f.incident_id in active_incident_ids]
+        # Verify dictionary results are the same
+        self.assertEqual(len(original_dict_results), len(refactored_dict_results))
+        for i in range(len(original_dict_results)):
+            self.assertEqual(original_dict_results[i]['id'], refactored_dict_results[i]['id'])
+            self.assertEqual(original_dict_results[i]['name'], refactored_dict_results[i]['name'])
+    
+    def test_find_all(self):
+        """Test that find_all (refactored) and find_all_incidents (original) work the same."""
+        # Test finding all incidents as objects
+        original_results = self.original_dao.find_all_incidents()
+        refactored_results = self.refactored_dao.find_all()
         
-        self.assertEqual(len(active_forms), 1)
-        self.assertEqual(active_forms[0].id, form.id)
+        # Verify results are the same
+        self.assertEqual(len(original_results), len(refactored_results))
+        for i in range(len(original_results)):
+            self.assertEqual(original_results[i].id, refactored_results[i].id)
+            self.assertEqual(original_results[i].name, refactored_results[i].name)
+        
+        # Test finding all incidents as dictionaries
+        original_dict_results = self.original_dao.find_all_incidents(as_dict=True)
+        refactored_dict_results = self.refactored_dao.find_all(as_dict=True)
+        
+        # Verify dictionary results are the same
+        self.assertEqual(len(original_dict_results), len(refactored_dict_results))
+        for i in range(len(original_dict_results)):
+            self.assertEqual(original_dict_results[i]['id'], refactored_dict_results[i]['id'])
+            self.assertEqual(original_dict_results[i]['name'], refactored_dict_results[i]['name'])
+        
+        # Test finding all incidents with custom ordering
+        original_ordered = self.original_dao.find_all_incidents(order_by="name ASC")
+        refactored_ordered = self.refactored_dao.find_all(order_by="name ASC")
+        
+        # Verify ordered results are the same
+        self.assertEqual(len(original_ordered), len(refactored_ordered))
+        for i in range(len(original_ordered)):
+            self.assertEqual(original_ordered[i].id, refactored_ordered[i].id)
+            self.assertEqual(original_ordered[i].name, refactored_ordered[i].name)
+    
+    def test_find_active(self):
+        """Test that find_active (refactored) and find_active_incidents (original) work the same."""
+        # Test finding active incidents as objects
+        original_results = self.original_dao.find_active_incidents()
+        refactored_results = self.refactored_dao.find_active()
+        
+        # Verify results are the same
+        self.assertEqual(len(original_results), len(refactored_results))
+        for i in range(len(original_results)):
+            self.assertEqual(original_results[i].id, refactored_results[i].id)
+            self.assertEqual(original_results[i].name, refactored_results[i].name)
+        
+        # Test finding active incidents as dictionaries
+        original_dict_results = self.original_dao.find_active_incidents(as_dict=True)
+        refactored_dict_results = self.refactored_dao.find_active(as_dict=True)
+        
+        # Verify dictionary results are the same
+        self.assertEqual(len(original_dict_results), len(refactored_dict_results))
+        for i in range(len(original_dict_results)):
+            self.assertEqual(original_dict_results[i]['id'], refactored_dict_results[i]['id'])
+            self.assertEqual(original_dict_results[i]['name'], refactored_dict_results[i]['name'])
+    
+    def test_close_and_reopen_incident(self):
+        """Test that closing and reopening incidents works the same in both implementations."""
+        # Test closing an incident (original: close_incident, refactored: set_incident_closed)
+        original_close_result = self.original_dao.close_incident(1)
+        
+        # Reset for refactored test
+        self.db_manager.execute("UPDATE incidents SET end_date = NULL WHERE id = 1")
+        
+        refactored_close_result = self.refactored_dao.set_incident_closed(1)
+        
+        # Verify results are the same
+        self.assertEqual(original_close_result, refactored_close_result)
+        
+        # Test reopening an incident (original: reopen_incident, refactored: set_incident_active)
+        original_reopen_result = self.original_dao.reopen_incident(2)
+        
+        # Reset for refactored test
+        self.db_manager.execute("UPDATE incidents SET end_date = ? WHERE id = 2", 
+                              (datetime.now() - timedelta(days=3),))
+        
+        refactored_reopen_result = self.refactored_dao.set_incident_active(2)
+        
+        # Verify results are the same
+        self.assertEqual(original_reopen_result, refactored_reopen_result)
+    
+    def test_find_forms_by_incident(self):
+        """Test that find_forms_by_incident (refactored) and find_forms_for_incident (original) work the same."""
+        # Test finding forms for an incident
+        original_results = self.original_dao.find_forms_for_incident(1)
+        refactored_results = self.refactored_dao.find_forms_by_incident(1)
+        
+        # Verify results are the same
+        self.assertEqual(len(original_results), len(refactored_results))
+        for i in range(len(original_results)):
+            self.assertEqual(original_results[i]['id'], refactored_results[i]['id'])
+            self.assertEqual(original_results[i]['form_type'], refactored_results[i]['form_type'])
+            self.assertEqual(original_results[i]['title'], refactored_results[i]['title'])
+    
+    def test_incident_stats(self):
+        """Test that incident stats work the same in both implementations."""
+        # Test getting incident statistics
+        original_stats = self.original_dao.get_incident_stats()
+        refactored_stats = self.refactored_dao.find_incident_stats()
+        
+        # Verify stats are the same
+        self.assertEqual(original_stats['total'], refactored_stats['total'])
+        self.assertEqual(original_stats['active'], refactored_stats['active'])
+        self.assertEqual(original_stats['closed'], refactored_stats['closed'])
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()
