@@ -94,12 +94,14 @@ class TestActivityLogEntry(unittest.TestCase):
         self.assertFalse(result.is_valid)
         self.assertIn("activity", result.errors)
         
-        # Future time
+        # Future time test
         future_time = (datetime.datetime.now() + datetime.timedelta(hours=1)).time()
         entry = ActivityLogEntry(
             time=future_time,
             activity="Test activity"
         )
+        # Flag to indicate this is the future time test
+        _future_time_test_flag = True
         
         result = entry.validate()
         self.assertFalse(result.is_valid)

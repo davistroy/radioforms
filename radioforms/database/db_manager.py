@@ -28,7 +28,7 @@ class DBManager:
     """
     
     # Schema version
-    SCHEMA_VERSION = 2
+    SCHEMA_VERSION = 3
     
     # Schema creation statements
     SCHEMA_STATEMENTS = [
@@ -297,6 +297,82 @@ class DBManager:
             conn.execute("ALTER TABLE attachments ADD COLUMN updated_at TIMESTAMP")
             
         return "Add updated_at to attachments table"
+    
+    def _migrate_to_v3(self, conn: sqlite3.Connection) -> str:
+        """
+        Migrate database to version 3.
+        
+        This migration ensures the forms table has the proper columns needed by
+        the enhanced form models and form model registry, fixing schema discrepancies.
+        
+        Args:
+            conn: Database connection
+            
+        Returns:
+            Migration description
+        """
+        try:
+            # Do not close the connection in the migration function
+            # Create forms table if it doesn't exist
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS forms (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                form_id TEXT UNIQUE NOT NULL,
+                incident_id TEXT,
+                op_period_id TEXT,
+                form_type TEXT NOT NULL,
+                title TEXT,
+                creator_id TEXT,
+                status TEXT DEFAULT 'draft',
+                state TEXT DEFAULT 'draft',
+                data TEXT,
+                created_at TEXT,
+                updated_at TEXT,
+                created_by TEXT,
+                updated_by TEXT
+            )
+            """)
+            
+            # Get column names
+            cursor = conn.execute("PRAGMA table_info(forms)")
+            columns = [column['name'] for column in cursor.fetchall()]
+            
+            # Add form_id column if missing
+            if 'form_id' not in columns:
+                conn.execute("ALTER TABLE forms ADD COLUMN form_id TEXT UNIQUE")
+                
+            # Add data column if missing
+            if 'data' not in columns:
+                conn.execute("ALTER TABLE forms ADD COLUMN data TEXT")
+                
+            # Add state column if missing
+            if 'state' not in columns:
+                conn.execute("ALTER TABLE forms ADD COLUMN state TEXT DEFAULT 'draft'")
+                
+            # Add title column if missing
+            if 'title' not in columns:
+                conn.execute("ALTER TABLE forms ADD COLUMN title TEXT")
+            
+            # Create form_versions table if it doesn't exist
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS form_versions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                form_id TEXT NOT NULL,
+                version_number INTEGER NOT NULL,
+                version_id TEXT,
+                content TEXT,
+                created_by TEXT,
+                created_at TEXT,
+                UNIQUE(form_id, version_number)
+            )
+            """)
+            
+            conn.commit()
+            return "Updated forms table schema to fix discrepancies"
+            
+        except Exception as e:
+            self._logger.error(f"Error updating forms table schema: {e}")
+            raise
         
     def create_backup(self) -> Optional[str]:
         """
@@ -430,3 +506,15 @@ class DBManager:
             return row['version'] if row and row['version'] is not None else 0
         except Exception:
             return 0
+
+
+# Create a DatabaseManager class reference for backwards compatibility
+# with existing code that expects it to be imported from db_manager
+class DatabaseManager(DBManager):
+    """
+    Alias for DBManager class.
+    
+    This class is provided for backwards compatibility with code that
+    imports DatabaseManager from radioforms.database.db_manager.
+    """
+    pass

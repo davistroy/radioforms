@@ -20,6 +20,7 @@ from PySide6.QtWidgets import QApplication
 
 from radioforms.config.config_manager import ConfigManager
 from radioforms.database.db_manager import DBManager
+from radioforms.database import DatabaseManager
 from radioforms.database.dao.form_dao_refactored import FormDAO
 from radioforms.database.dao.incident_dao_refactored import IncidentDAO
 from radioforms.models.form_model_registry import FormModelRegistry
