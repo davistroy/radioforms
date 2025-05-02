@@ -153,6 +153,16 @@ Based on the detailed assessment of the project status and identified discrepanc
 | 4.4 | Create FAQ section | 2 | Medium |
 | 4.5 | Implement in-app help viewer | 3 | Medium |
 
+### 4.5 Improve Data Architecture (High Priority)
+
+| ID | Task | Effort (Days) | Priority |
+|:---|:-----|:--------------|:---------|
+| 5.1 | Standardize Field Names and Avoid SQL Reserved Words | 2 | High |
+| 5.2 | Implement Schema Management Framework | 3 | High |
+| 5.3 | Consolidate DAO Layer Implementation | 5 | High |
+| 5.4 | Create Data Transformation Layer | 4 | Medium |
+| 5.5 | Enhance Test Infrastructure for Data Layer | 3 | Medium |
+
 ## 5. Detailed Task Breakdown for Next Steps
 
 ### 5.1 Complete Enhanced Form Models and Editors
@@ -218,6 +228,38 @@ Based on the detailed assessment of the project status and identified discrepanc
 - Create timeline visualization of state changes
 - Add detailed view of state transition events
 - Implement filtering of history records
+
+### 5.3 Implement Data Architecture Improvements
+
+#### 5.3.1 Standardize Field Names and Avoid SQL Reserved Words
+- Rename 'to' field in ICS-213 forms to 'recipient' across codebase
+- Update serialization/deserialization code to handle field mapping
+- Update UI components to bind to the correct property names
+- Create consistent naming guidelines for future development
+
+#### 5.3.2 Implement Schema Management Framework
+- Create dedicated schema management module
+- Add schema version checking on application startup
+- Implement proper migration tracking and execution
+- Add database integrity checking functionality
+
+#### 5.3.3 Consolidate DAO Layer Implementation
+- Select one DAO pattern and standardize all implementations
+- Create a DAO factory to manage instantiation
+- Implement consistent error handling and result types
+- Develop migration path from legacy DAOs
+
+#### 5.3.4 Create Data Transformation Layer
+- Implement DTOs for all model-database interactions
+- Create mappers to convert between domain models and DTOs
+- Separate serialization concerns from business logic
+- Add validation at the transformation layer
+
+#### 5.3.5 Enhance Test Infrastructure for Data Layer
+- Create standard test database fixture with proper schema
+- Implement DAO mocking utilities for consistent test behavior
+- Add serialization/deserialization property-based tests
+- Develop automated integration tests for the data layer
 
 ## 6. Implementation Details for Next Components
 
@@ -575,3 +617,121 @@ With these critical components in place, the project is well-positioned to move 
 4. **Accessibility Features**: Making the application usable by all users
 
 The solid foundation established through the modular architecture, comprehensive test coverage, and performance-focused design provides an excellent platform for these final features. The project is now entering its final stages before release preparation can begin.
+
+## 9. Long-Term Architectural Vision
+
+To ensure the RadioForms application remains maintainable, extensible, and robust in the future, the following strategic architectural changes are recommended for consideration after the initial release, along with effort estimates for implementation:
+
+### 9.1 Implement Domain-Driven Design (DDD)
+- **Complexity**: HIGH
+- **Estimated Effort**: 3-4 person-months
+- Clearly separate domain models from data access objects
+- Use aggregates to enforce business rules and invariants
+- Create a ubiquitous language throughout the codebase
+- Define explicit bounded contexts for different application areas
+- **Key Benefits**: Improved business logic organization, better alignment with domain requirements
+- **Challenge**: Requires significant refactoring of existing code
+
+### 9.2 Adopt Test-Driven Development (TDD)
+- **Complexity**: MEDIUM
+- **Estimated Effort**: 1-2 person-months
+- Write tests before implementation to ensure coverage
+- Focus on testing business requirements rather than implementation details
+- Use the test pyramid approach (more unit tests, fewer integration tests)
+- Implement continuous integration with automated test runs
+- **Key Benefits**: Higher test coverage, fewer regressions, clearer requirements
+- **Challenge**: Initial productivity slowdown during adoption
+
+### 9.3 Implement a Proper Repository Pattern
+- **Complexity**: MEDIUM
+- **Estimated Effort**: 3-4 weeks
+- Abstract all data access behind consistent interfaces
+- Remove direct SQL from business logic completely
+- Implement unit of work pattern for transaction management
+- Use dependency injection for better testability
+- **Key Benefits**: Improved testability, cleaner business logic, potential for multiple storage backends
+- **Challenge**: Requires careful database access optimization
+
+### 9.4 Standardize Error Handling
+- **Complexity**: LOW to MEDIUM
+- **Estimated Effort**: 2-3 weeks
+- Create a consistent application-wide error handling strategy
+- Implement proper logging at appropriate levels
+- Add structured error responses with actionable information
+- Use custom exception types to represent domain-specific errors
+- **Key Benefits**: Improved debugging, better user experience, enhanced reliability
+- **Challenge**: Finding all error handling locations in existing code
+
+### 9.5 Implement Schema Migration as a First-Class Concern
+- **Complexity**: MEDIUM
+- **Estimated Effort**: 3-4 weeks
+- Use a dedicated migration framework (like Alembic)
+- Version all schema changes with proper documentation
+- Implement automated testing of migrations
+- Create a migration testing environment separate from production
+- **Key Benefits**: Safer database evolution, better version control, improved reliability
+- **Challenge**: Handling existing production databases during transition
+
+### 9.6 ORM Adoption
+- **Complexity**: HIGH
+- **Estimated Effort**: 2-3 person-months
+- Evaluate SQLAlchemy or similar ORM for RadioForms
+- Create a migration plan from custom DAOs to ORM
+- Implement proper migration tests
+- **Key Benefits**: Reduced boilerplate, more consistent database operations
+- **Challenge**: Significant migration effort for existing code
+
+### 9.7 Event-Driven Architecture
+- **Complexity**: MEDIUM
+- **Estimated Effort**: 6-8 weeks
+- Implement an event system for form state changes
+- Decouple UI updates from business operations
+- Create a central event bus for component communication
+- **Key Benefits**: Reduced coupling between components
+- Enable more flexible UI updates and business logic
+
+### 9.8 Storage Abstraction Layer
+- **Complexity**: MEDIUM
+- **Estimated Effort**: 4-6 weeks
+- Create storage interfaces independent of SQLite
+- Enable potential future support for different storage backends
+- Improve testability with mock storage implementations
+- Facilitate cloud synchronization options in the future
+- **Key Benefits**: Future flexibility, improved testing, potential cloud support
+
+### 9.9 Command Pattern for Operations
+- **Complexity**: MEDIUM
+- **Estimated Effort**: 4-5 weeks
+- Implement commands for all form operations
+- Enable undo/redo functionality
+- Improve auditability with command logging
+- Enhance user experience with operation history
+- **Key Benefits**: Enhanced user experience, better auditability, simpler operation management
+
+## 10. Phased Implementation Approach for Architectural Improvements
+
+Given the estimated complexity and effort for the architectural improvements, a phased approach is recommended:
+
+### Phase 1 (1-2 months)
+- Error Handling Standardization (quick wins, lowest complexity)
+- Repository Pattern Implementation (foundation for other improvements)
+
+### Phase 2 (2-3 months)
+- Schema Migration as First-Class Concern
+- TDD Adoption (start with new features, gradually expand)
+- Command Pattern for Operations
+
+### Phase 3 (3-6 months)
+- Domain-Driven Design Implementation
+- Event-Driven Architecture 
+- Storage Abstraction Layer
+
+### Phase 4 (4-6 months)
+- ORM Adoption (after proper abstraction is in place)
+- Final refinements and optimization
+
+This phased approach allows for:
+- Incremental improvement without disrupting ongoing development
+- Earlier realization of benefits from simpler changes
+- Building team expertise gradually with increasing complexity
+- Managing risk by tackling complex changes after establishing a foundation

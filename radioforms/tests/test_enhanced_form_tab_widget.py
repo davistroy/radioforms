@@ -17,6 +17,7 @@ from radioforms.views.form_tab_widget import FormTabWidget, FormTableModel, Form
 from radioforms.models.form_model_registry import FormModelRegistry
 from radioforms.database import DatabaseManager  # Import the alias from __init__
 from radioforms.database.dao.form_dao_refactored import FormDAO
+from unittest import mock
 
 
 # Ensure QApplication exists for Qt widgets
@@ -237,6 +238,14 @@ class TestFormTabWidget(unittest.TestCase):
         # Create mocks
         self.form_registry = MagicMock()
         self.form_dao = MagicMock()
+        # Add mock db_manager attribute
+        self.form_dao.db_manager = MagicMock()
+        # Add mock connect method that returns a connection with execute method
+        mock_connection = MagicMock()
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = {"form_id": "test_id_123"}
+        mock_connection.execute.return_value = mock_cursor
+        self.form_dao.db_manager.connect.return_value = mock_connection
         
         # Create widget
         self.widget = FormTabWidget(self.form_registry, self.form_dao)

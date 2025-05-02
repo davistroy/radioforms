@@ -15,6 +15,7 @@ import datetime
 from typing import Dict, List, Any, Optional, Type, Union, cast
 
 from radioforms.database.dao.form_dao_refactored import FormDAO
+from radioforms.models.enhanced_form_resolver import resolve_form_type, extract_form_type_from_id
 
 
 class FormModelRegistry:
@@ -292,17 +293,21 @@ class FormModelRegistry:
                                 form_data[key] = value
                     except json.JSONDecodeError:
                         self._logger.warning(f"Could not parse form data for form {form_id}")
-                
-            # Get form type
+            
+            # Use enhanced form resolver for type resolution
             form_type = form_data.get("form_type")
             
+            # If form type is not explicitly set, use the resolver
+            if not form_type or not form_type.strip():
+                resolved_type = resolve_form_type(form_data, form_id)
+                form_type = resolved_type
+                self._logger.info(f"Resolved form type {form_type} for form {form_id} using enhanced resolver")
+                
+            # Final check - ensure the form type is registered
             if not form_type:
-                self._logger.warning(f"Form type not found for form {form_id}")
+                self._logger.warning(f"Could not resolve form type for form {form_id}")
                 return None
                 
-            # Get form type
-            form_type = form_data.get("form_type")
-            
             if form_type not in self._form_types:
                 self._logger.warning(f"Form type {form_type} not registered")
                 return None
@@ -349,6 +354,9 @@ class FormModelRegistry:
             
             return form
             
+        except Exception as e:
+            self._logger.error(f"Failed to load form {form_id}: {e}")
+            return None
         except Exception as e:
             self._logger.error(f"Failed to load form {form_id}: {e}")
             return None
@@ -431,8 +439,7 @@ class FormModelRegistry:
             db_object = {
                 "form_id": form.form_id,
                 "form_type": form.form_type,
-                "state": state,
-                "status": state,  # Status field matches state
+                "state": state,  # Status field matches state
                 "title": form_dict.get("title", "") or form_dict.get("subject", "") or form_dict.get("incident_name", "") or form.form_type,
                 "incident_id": form_dict.get("incident_id", None),
                 "creator_id": form_dict.get("creator_id", None),

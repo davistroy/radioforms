@@ -13,6 +13,7 @@ import os
 import uuid
 import datetime
 import tempfile
+import json
 from unittest.mock import MagicMock, patch
 
 from radioforms.models.enhanced_ics213_form import EnhancedICS213Form, FormState as ICS213FormState
@@ -20,6 +21,7 @@ from radioforms.models.enhanced_ics214_form import EnhancedICS214Form, FormState
 from radioforms.models.form_model_registry import FormModelRegistry
 from radioforms.database.dao.form_dao_refactored import FormDAO
 from radioforms.database.dao.attachment_dao_refactored import AttachmentDAO
+from unittest import mock
 
 
 class TestEnhancedFormIntegration(unittest.TestCase):
@@ -29,6 +31,14 @@ class TestEnhancedFormIntegration(unittest.TestCase):
         """Set up test fixtures before each test."""
         # Create mock DAOs
         self.form_dao = MagicMock(spec=FormDAO)
+        # Add mock db_manager attribute
+        self.form_dao.db_manager = MagicMock()
+        # Add mock connect method that returns a connection with execute method
+        mock_connection = MagicMock()
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = {"form_id": "test_id_123"}
+        mock_connection.execute.return_value = mock_cursor
+        self.form_dao.db_manager.connect.return_value = mock_connection
         self.attachment_dao = MagicMock(spec=AttachmentDAO)
         
         # Set up registry
@@ -94,7 +104,7 @@ class TestEnhancedFormIntegration(unittest.TestCase):
         
         # Set up mocks BEFORE creating the form
         self.form_dao.create.return_value = "123"
-        self.form_dao.find_by_id.return_value = test_data
+        self.form_dao.find_by_id.return_value = {"form_id": "123", "form_type": "ICS-213", "data": json.dumps({"to": "John Doe", "from_field": "Jane Smith", "subject": "Resource Request", "message": "We need additional supplies.", "sender_name": "Jane Smith"})}
         
         # Create and configure form data for ICS-213
         ics213 = self.registry.create_form("ICS-213")
@@ -148,7 +158,7 @@ class TestEnhancedFormIntegration(unittest.TestCase):
         
         # Set up mocks
         self.form_dao.create.return_value = "456"
-        self.form_dao.find_by_id.return_value = test_data
+        self.form_dao.find_by_id.return_value = {"form_id": "123", "form_type": "ICS-213", "data": json.dumps({"to": "John Doe", "from_field": "Jane Smith", "subject": "Resource Request", "message": "We need additional supplies.", "sender_name": "Jane Smith"})}
         
         # Create and configure form data for ICS-214
         ics214 = self.registry.create_form("ICS-214")
@@ -185,7 +195,7 @@ class TestEnhancedFormIntegration(unittest.TestCase):
         self.assertEqual(test_data["personnel"][0]["name"], "John Doe")
         
         # Configure mock for loading
-        self.form_dao.find_by_id.return_value = test_data
+        self.form_dao.find_by_id.return_value = {"form_id": "123", "form_type": "ICS-213", "data": json.dumps({"to": "John Doe", "from_field": "Jane Smith", "subject": "Resource Request", "message": "We need additional supplies.", "sender_name": "Jane Smith"})}
         
         # Load the form
         loaded_form = self.registry.load_form("456")
@@ -222,20 +232,7 @@ class TestEnhancedFormIntegration(unittest.TestCase):
         """Test finding forms with criteria."""
         # Configure mock
         self.form_dao.find_by_fields = MagicMock()
-        self.form_dao.find_by_fields.return_value = [
-            {
-                "form_id": "123",
-                "form_type": "ICS-213",
-                "to": "John Doe",
-                "state": "draft"
-            },
-            {
-                "form_id": "124",
-                "form_type": "ICS-213",
-                "to": "Jane Smith",
-                "state": "approved"
-            }
-        ]
+        self.form_dao.find_by_fields.return_value = [{"form_id": "123", "form_type": "ICS-213", "data": json.dumps({"to": "John Doe", "state": "draft"})}, {"form_id": "124", "form_type": "ICS-213", "data": json.dumps({"to": "Jane Smith", "state": "approved"})}]
         
         # Find forms as dictionaries
         forms = self.registry.find_forms({"form_type": "ICS-213"}, as_dict=True)
@@ -247,14 +244,7 @@ class TestEnhancedFormIntegration(unittest.TestCase):
         
         # Find forms as objects
         self.form_dao.find_by_fields.reset_mock()
-        self.form_dao.find_by_fields.return_value = [
-            {
-                "form_id": "456",
-                "form_type": "ICS-214",
-                "incident_name": "Test Incident",
-                "state": "finalized"
-            }
-        ]
+        self.form_dao.find_by_fields.return_value = [{"form_id": "456", "form_type": "ICS-214", "data": json.dumps({"incident_name": "Test Incident", "state": "finalized"})}]
         
         forms = self.registry.find_forms({"form_type": "ICS-214"}, as_dict=False)
         
@@ -272,7 +262,7 @@ class TestEnhancedFormIntegration(unittest.TestCase):
             "form_id": "123", 
             "form_type": "ICS-213",
             "version": 1
-        }
+        , "data": "{}"}
         self.form_dao.create_version = MagicMock()
         
         # Create a form and update it
@@ -288,7 +278,7 @@ class TestEnhancedFormIntegration(unittest.TestCase):
             "form_type": "ICS-213",
             "version": 2,
             "to": "Version 2"
-        })
+        , "to": "Version 2", "data": "{\"to\": \"Version 2\"}"})
         
         # Load a specific version
         versioned_form = self.registry.load_form("123", version_id="v2")
@@ -302,7 +292,7 @@ class TestEnhancedFormIntegration(unittest.TestCase):
         """Test form state transitions with persistence."""
         # Configure mock
         self.form_dao.create.return_value = "123"
-        self.form_dao.find_by_id.return_value = {"form_id": "123", "form_type": "ICS-213"}
+        self.form_dao.find_by_id.return_value = {"form_id": "123", "form_type": "ICS-213", "data": "{}"}
         
         # Create an ICS-213 form
         form = EnhancedICS213Form()

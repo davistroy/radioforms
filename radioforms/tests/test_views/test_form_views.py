@@ -21,6 +21,7 @@ from pytestqt.qt_compat import qt_api
 from radioforms.models.ics213_form import ICS213Form
 from radioforms.models.ics214_form import ICS214Form, ActivityLogEntry
 from radioforms.views.form_view_base import FormViewBase
+from unittest import mock
 
 
 # Make sure QApplication exists for the tests

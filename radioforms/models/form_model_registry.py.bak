@@ -220,11 +220,84 @@ class FormModelRegistry:
             return None
             
         try:
-            # Load form data from DAO
-            form_data = self._form_dao.find_by_id(form_id, as_dict=True)
+            # Use direct SQL to bypass DAO issues
+            conn = self._form_dao.db_manager.connect()
             
-            if not form_data:
-                self._logger.warning(f"Form with ID {form_id} not found")
+            # Load form data
+            if version_id:
+                cursor = conn.execute(
+                    """
+                    SELECT content FROM form_versions
+                    WHERE version_id = ?
+                    """,
+                    (version_id,)
+                )
+                version_row = cursor.fetchone()
+                if not version_row:
+                    self._logger.warning(f"Form version with ID {version_id} not found")
+                    return None
+                
+                # Parse version content
+                try:
+                    form_data = json.loads(version_row['content'])
+                except (json.JSONDecodeError, TypeError):
+                    form_data = {}
+                
+                # Get form type from form data
+                form_type = form_data.get("form_type")
+                
+                # Also get form metadata
+                cursor = conn.execute(
+                    """
+                    SELECT * FROM forms
+                    WHERE form_id = ?
+                    """,
+                    (form_id,)
+                )
+                form_row = cursor.fetchone()
+                if form_row:
+                    # Add form metadata to form data
+                    form_data.update({
+                        "form_id": form_id,
+                        "form_type": form_row["form_type"],
+                        "state": form_row["state"],
+                        "created_at": form_row["created_at"],
+                        "updated_at": form_row["updated_at"]
+                    })
+            else:
+                # Load current form data
+                cursor = conn.execute(
+                    """
+                    SELECT * FROM forms
+                    WHERE form_id = ?
+                    """,
+                    (form_id,)
+                )
+                form_row = cursor.fetchone()
+                
+                if not form_row:
+                    self._logger.warning(f"Form with ID {form_id} not found")
+                    return None
+                    
+                # Get form metadata
+                form_data = dict(form_row)
+                
+                # Parse form content from data field
+                if "data" in form_data and form_data["data"]:
+                    try:
+                        content_data = json.loads(form_data["data"])
+                        # Add content data to form data
+                        for key, value in content_data.items():
+                            if key not in form_data:
+                                form_data[key] = value
+                    except json.JSONDecodeError:
+                        self._logger.warning(f"Could not parse form data for form {form_id}")
+                
+            # Get form type
+            form_type = form_data.get("form_type")
+            
+            if not form_type:
+                self._logger.warning(f"Form type not found for form {form_id}")
                 return None
                 
             # Get form type
@@ -236,25 +309,41 @@ class FormModelRegistry:
                 
             # Create form instance
             model_class = self._form_types[form_type]
-            form = model_class()
             
-            # Load data into form
-            try:
-                # First try to parse as JSON
-                form_data_json = json.loads(form_data.get("data", "{}"))
-                form.__dict__.update(form_data_json)
-            except (json.JSONDecodeError, TypeError):
-                # If that fails, just use the data directly for test mocks
+            # Check if the form has a from_dict method
+            if hasattr(model_class, 'from_dict') and callable(getattr(model_class, 'from_dict')):
+                # Use the form's from_dict method
+                form = model_class.from_dict(form_data)
+            else:
+                # Create a new instance and manually set attributes
+                form = model_class()
+                
+                # Process JSON data if present
+                if "data" in form_data and form_data["data"]:
+                    try:
+                        # Try to parse JSON data
+                        json_data = json.loads(form_data["data"])
+                        
+                        # Update form attributes from JSON data
+                        for key, value in json_data.items():
+                            if hasattr(form, key):
+                                setattr(form, key, value)
+                    except json.JSONDecodeError:
+                        self._logger.warning(f"Could not parse JSON data for form {form_id}")
+                        
+                # Set form metadata fields directly from form_data
+                for key in ["form_id", "form_type", "state", "status", "created_at", "updated_at", "title"]:
+                    if key in form_data and hasattr(form, key):
+                        setattr(form, key, form_data[key])
+                        
+                # Also try to copy any other fields that might be in the form
                 for key, value in form_data.items():
-                    if key not in ["form_id", "form_type", "state", "created_at", "updated_at"]:
-                        setattr(form, key, value)
+                    if key not in ["form_id", "form_type", "state", "status", "created_at", "updated_at", "data", "title"]:
+                        if hasattr(form, key):
+                            setattr(form, key, value)
             
-            # Set metadata
+            # Ensure the form ID is set
             form.form_id = form_id
-            form.form_type = form_type
-            form.state = form_data.get("state", "draft")
-            form.created_at = form_data.get("created_at")
-            form.updated_at = form_data.get("updated_at")
             
             self._logger.debug(f"Loaded form of type {form_type} with ID {form_id}")
             
@@ -303,77 +392,6 @@ class FormModelRegistry:
                 else:
                     self._logger.error("Form type not set and cannot be determined")
                     return None
-                
-            # Try to use the form's to_dict method first
-            if hasattr(form, "to_dict") and callable(getattr(form, "to_dict")):
-                try:
-                    form_dict = form.to_dict()
-                    
-                    # Create DAO object from form dict
-                    dao_object = {
-                        "form_id": form.form_id,
-                        "form_type": form.form_type,
-                        "state": form_dict.get("state", "draft"),
-                        "status": form_dict.get("status", "draft"),
-                        "data": json.dumps(form_dict),
-                        "created_at": form.created_at.isoformat() if isinstance(form.created_at, datetime.datetime) else form.created_at,
-                        "updated_at": form.updated_at.isoformat() if isinstance(form.updated_at, datetime.datetime) else form.updated_at,
-                        "title": form_dict.get("title", "") or form_dict.get("subject", "") or form_dict.get("incident_name", "") or form.form_type,
-                        "incident_id": form_dict.get("incident_id", None),
-                        "creator_id": form_dict.get("creator_id", None),
-                    }
-                except Exception as e:
-                    self._logger.warning(f"Failed to use to_dict method, falling back: {e}")
-                    
-                    # Fall back to the old approach
-                    form_data = {}
-                    for key, value in form.__dict__.items():
-                        # Skip special fields that will be stored separately
-                        if key.startswith("_") or key in ["form_id", "form_type", "state", "created_at", "updated_at"]:
-                            continue
-                            
-                        # Handle special types
-                        if isinstance(value, (datetime.datetime, datetime.date)):
-                            form_data[key] = value.isoformat()
-                        else:
-                            form_data[key] = value
-                            
-                    # Create DAO object from form attributes
-                    dao_object = {
-                        "form_id": form.form_id,
-                        "form_type": form.form_type,
-                        "state": getattr(form.state, "value", form.state) if hasattr(form, "state") else "draft",
-                        "status": getattr(form.state, "value", form.state) if hasattr(form, "state") else "draft",
-                        "data": json.dumps(form_data),
-                        "created_at": form.created_at.isoformat() if isinstance(form.created_at, datetime.datetime) else form.created_at,
-                        "updated_at": form.updated_at.isoformat() if isinstance(form.updated_at, datetime.datetime) else form.updated_at,
-                        "title": getattr(form, "subject", "") or getattr(form, "incident_name", "") or form.form_type,
-                    }
-            else:
-                # Fall back to the old approach
-                form_data = {}
-                for key, value in form.__dict__.items():
-                    # Skip special fields that will be stored separately
-                    if key.startswith("_") or key in ["form_id", "form_type", "state", "created_at", "updated_at"]:
-                        continue
-                        
-                    # Handle special types
-                    if isinstance(value, (datetime.datetime, datetime.date)):
-                        form_data[key] = value.isoformat()
-                    else:
-                        form_data[key] = value
-                        
-                # Create DAO object from form attributes
-                dao_object = {
-                    "form_id": form.form_id,
-                    "form_type": form.form_type,
-                    "state": getattr(form.state, "value", form.state) if hasattr(form, "state") else "draft",
-                    "status": getattr(form.state, "value", form.state) if hasattr(form, "state") else "draft",
-                    "data": json.dumps(form_data),
-                    "created_at": form.created_at.isoformat() if isinstance(form.created_at, datetime.datetime) else form.created_at,
-                    "updated_at": form.updated_at.isoformat() if isinstance(form.updated_at, datetime.datetime) else form.updated_at,
-                    "title": getattr(form, "subject", "") or getattr(form, "incident_name", "") or form.form_type,
-                }
             
             # First try the form's save_to_dao method for best integration
             if hasattr(form, "save_to_dao") and callable(getattr(form, "save_to_dao")):
@@ -384,20 +402,158 @@ class FormModelRegistry:
                 except Exception as save_dao_error:
                     self._logger.warning(f"Form.save_to_dao failed, trying direct DAO methods: {save_dao_error}")
             
-            # Fall back to direct DAO operations
+            # Convert to dictionary for storage
+            if hasattr(form, "to_dict") and callable(getattr(form, "to_dict")):
+                try:
+                    form_dict = form.to_dict()
+                except Exception as e:
+                    self._logger.warning(f"Form.to_dict failed: {e}")
+                    form_dict = {}
+                    
+                    # Fallback: manually extract attributes
+                    for key, value in form.__dict__.items():
+                        if not key.startswith("_"):
+                            form_dict[key] = value
+            else:
+                # Extract attributes manually
+                form_dict = {}
+                for key, value in form.__dict__.items():
+                    if not key.startswith("_"):
+                        form_dict[key] = value
+            
+            # Process form state
+            state = form_dict.get("state", "draft")
+            if hasattr(state, "value"):
+                # Handle Enum values
+                state = state.value
+                
+            # Create a standardized database object that matches the schema
+            db_object = {
+                "form_id": form.form_id,
+                "form_type": form.form_type,
+                "state": state,
+                "status": state,  # Status field matches state
+                "title": form_dict.get("title", "") or form_dict.get("subject", "") or form_dict.get("incident_name", "") or form.form_type,
+                "incident_id": form_dict.get("incident_id", None),
+                "creator_id": form_dict.get("creator_id", None),
+                "created_at": form.created_at.isoformat() if isinstance(form.created_at, datetime.datetime) else form.created_at,
+                "updated_at": form.updated_at.isoformat() if isinstance(form.updated_at, datetime.datetime) else form.updated_at,
+                "data": json.dumps(form_dict)
+            }
+            
+            # Attempt direct SQL interaction if needed 
             try:
-                existing_form = self._form_dao.find_by_id(form.form_id)
+                # Check if form already exists using direct SQL
+                conn = self._form_dao.db_manager.connect()
                 
-                if existing_form:
-                    # Update existing form
-                    self._form_dao.update(form.form_id, dao_object)
+                # Check if form exists
+                cursor = conn.execute(
+                    "SELECT form_id FROM forms WHERE form_id = ?", 
+                    (form.form_id,)
+                )
+                
+                existing = cursor.fetchone() is not None
+                
+                if existing:
+                    # Update existing form using direct SQL
+                    self._logger.info(f"Updating existing form with ID {form.form_id}")
+                    conn.execute(
+                        """
+                        UPDATE forms SET
+                            form_type = ?,
+                            state = ?,
+                            title = ?,
+                            data = ?,
+                            updated_at = ?
+                        WHERE form_id = ?
+                        """,
+                        (
+                            form.form_type,
+                            state,
+                            db_object["title"],
+                            db_object["data"],
+                            db_object["updated_at"],
+                            form.form_id
+                        )
+                    )
                 else:
-                    # Create new form
-                    self._form_dao.create(dao_object)
-            except Exception as e:
-                self._logger.error(f"Failed to save form using DAO: {e}")
-                raise
+                    # Create new form using direct SQL
+                    self._logger.info(f"Creating new form with ID {form.form_id}")
+                    conn.execute(
+                        """
+                        INSERT INTO forms (
+                            form_id, form_type, state, title, 
+                            data, created_at, updated_at, incident_id, created_by
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            form.form_id,
+                            form.form_type,
+                            state,
+                            db_object["title"],
+                            db_object["data"],
+                            db_object["created_at"],
+                            db_object["updated_at"],
+                            db_object.get("incident_id"),
+                            db_object.get("creator_id")
+                        )
+                    )
                 
+                conn.commit()
+                
+                # Fall back to DAO methods
+                if hasattr(self._form_dao, 'create') and callable(getattr(self._form_dao, 'create')) and not existing:
+                    try:
+                        # Also try the DAO methods for logging purposes
+                        created_id = self._form_dao.create(db_object)
+                        if created_id != form.form_id:
+                            self._logger.warning(f"DAO created ID ({created_id}) differs from form ID ({form.form_id})")
+                    except Exception as e:
+                        self._logger.debug(f"DAO create method failed, but direct SQL succeeded: {e}")
+                elif hasattr(self._form_dao, 'update') and callable(getattr(self._form_dao, 'update')) and existing:
+                    try:
+                        # Also try the DAO methods for logging purposes
+                        self._form_dao.update(form.form_id, db_object)
+                    except Exception as e:
+                        self._logger.debug(f"DAO update method failed, but direct SQL succeeded: {e}")
+            except Exception as sql_error:
+                self._logger.error(f"Direct SQL operation failed: {sql_error}")
+                
+                # Fall back to trying the DAO methods
+                try:
+                    if hasattr(self._form_dao, 'find_by_id') and callable(getattr(self._form_dao, 'find_by_id')):
+                        existing = self._form_dao.find_by_id(form.form_id)
+                    else:
+                        # Assume it's a new form if we can't check
+                        existing = None
+                        
+                    if existing:
+                        # Update existing form
+                        success = self._form_dao.update(form.form_id, db_object)
+                        if not success:
+                            self._logger.error(f"Failed to update form with ID {form.form_id}")
+                            return None
+                    else:
+                        # Create new form
+                        created_id = self._form_dao.create(db_object)
+                        if not created_id:
+                            self._logger.error(f"Failed to create form with ID {form.form_id}")
+                            return None
+                            
+                        # Ensure form_id matches the created ID if it's different
+                        if created_id != form.form_id:
+                            form.form_id = created_id
+                except Exception as dao_error:
+                    self._logger.error(f"DAO operation failed after SQL failure: {dao_error}")
+                    return None
+            
+            # Create version if requested
+            if create_version and hasattr(self._form_dao, 'create_version'):
+                try:
+                    self._form_dao.create_version(form.form_id, form_dict)
+                except Exception as version_error:
+                    self._logger.warning(f"Failed to create form version: {version_error}")
+            
             self._logger.debug(f"Saved form of type {form.form_type} with ID {form.form_id}")
             
             return form.form_id

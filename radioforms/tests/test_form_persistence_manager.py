@@ -17,6 +17,7 @@ from radioforms.models.form_persistence_manager import FormPersistenceManager
 from radioforms.models.enhanced_ics213_form import EnhancedICS213Form, FormState
 from radioforms.database.dao.form_dao_refactored import FormDAO
 from radioforms.database.dao.attachment_dao_refactored import AttachmentDAO
+from unittest import mock
 
 
 class TestFormPersistenceManager(unittest.TestCase):
@@ -25,6 +26,18 @@ class TestFormPersistenceManager(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures before each test method is run."""
         self.form_dao = MagicMock(spec=FormDAO)
+        # Add db_manager for direct SQL approach
+        self.form_dao.db_manager = MagicMock()
+        mock_connection = MagicMock()
+        self.form_dao.db_manager.connect.return_value = mock_connection
+        # Add mock db_manager attribute
+        self.form_dao.db_manager = MagicMock()
+        # Add mock connect method that returns a connection with execute method
+        mock_connection = MagicMock()
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = {"form_id": "test_id_123"}
+        mock_connection.execute.return_value = mock_cursor
+        self.form_dao.db_manager.connect.return_value = mock_connection
         self.attachment_dao = MagicMock(spec=AttachmentDAO)
         self.manager = FormPersistenceManager(self.form_dao, self.attachment_dao)
         
@@ -66,7 +79,30 @@ class TestFormPersistenceManager(unittest.TestCase):
         
         # Test updating an existing form
         self.form_dao.reset_mock()
-        self.form_dao.find_by_id.return_value = {"id": "456", "to": "John Doe"}
+        self.form_dao.find_by_id.return_value = {"id": "456", "to": "John Doe", "data": "{}
+        # Configure for direct SQL approach
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = {"id": "456", "to": "John Doe", "data": "{}
+        self.form_dao.db_manager.connect().execute.return_value = mock_cursor
+        # Configure for direct SQL approach
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = None
+        self.form_dao.create.return_value = "456"
+        
+        form_id = self.manager.save_form(form)
+        
+        self.assertEqual(form_id, "456")
+        self.assertEqual(form.form_id, "456")
+        self.form_dao.create.assert_called_once()
+        
+        # Test updating an existing form
+        self.form_dao.reset_mock()
+        self.form_dao.find_by_id.return_value = {"id": "456", "to": "John Doe", "data": "{}
+        # Configure for direct SQL approach
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = {"id": "456", "to": "John Doe", "data": "{}
+        self.form_dao.db_manager.connect().execute.return_value = mock_cursor
+        self.form_dao.db_manager.connect().execute.return_value = mock_cursor"}
         
         form_id = self.manager.save_form(form)
         
@@ -75,7 +111,11 @@ class TestFormPersistenceManager(unittest.TestCase):
         
         # Test creating a version
         self.form_dao.reset_mock()
-        self.form_dao.find_by_id.return_value = {"id": "456", "to": "John Doe"}
+        self.form_dao.find_by_id.return_value = {"id": "456", "to": "John Doe", "data": "{}
+        # Configure for direct SQL approach
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = {"id": "456", "to": "John Doe", "data": "{}
+        self.form_dao.db_manager.connect().execute.return_value = mock_cursor"}
         self.form_dao.create_version = MagicMock()
         
         form_id = self.manager.save_form(form, create_version=True)
@@ -93,7 +133,17 @@ class TestFormPersistenceManager(unittest.TestCase):
             "to": "John Doe",
             "from": "Jane Smith",
             "subject": "Test Subject"
-        }
+        , "data": "{}
+        # Configure for direct SQL approach
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = {
+            "form_id": "789",
+            "form_type": "ICS-213",
+            "to": "John Doe",
+            "from": "Jane Smith",
+            "subject": "Test Subject"
+        , "data": "{}
+        self.form_dao.db_manager.connect().execute.return_value = mock_cursor"}
         
         form = self.manager.load_form("789")
         
@@ -118,7 +168,24 @@ class TestFormPersistenceManager(unittest.TestCase):
             "form_type": "ICS-213",
             "to": "John Doe (Version)",
             "version": 2
-        })
+        }
+        # Configure for direct SQL approach
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = None
+        
+        form = self.manager.load_form("999")
+        
+        self.assertIsNone(form)
+        
+        # Test loading a specific version
+        self.form_dao.reset_mock()
+        self.form_dao.find_version_by_id = MagicMock(return_value={
+            "form_id": "789",
+            "form_type": "ICS-213",
+            "to": "John Doe (Version)",
+            "version": 2
+        }
+        self.form_dao.db_manager.connect().execute.return_value = mock_cursor)
         
         form = self.manager.load_form("789", version_id="v2")
         

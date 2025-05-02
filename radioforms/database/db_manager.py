@@ -15,8 +15,11 @@ import sqlite3
 import logging
 import datetime
 import shutil
+import json
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Union, Tuple
+
+from radioforms.database.schema_manager import SchemaManager
 
 
 class DBManager:
@@ -195,183 +198,34 @@ class DBManager:
         
         This method creates the necessary tables if they don't exist
         and runs migrations to update the schema to the latest version.
+        
+        Uses the SchemaManager for robust schema versioning and migration.
         """
         try:
-            conn = self.connect()
+            # Use the enhanced schema manager for versioning and migrations
+            schema_manager = SchemaManager(self._db_path)
             
-            # Create tables
-            for statement in self.SCHEMA_STATEMENTS:
-                conn.execute(statement)
+            # Initialize schema manager
+            schema_manager.initialize()
+            
+            # Upgrade to latest schema version
+            if schema_manager.upgrade():
+                # Get the current schema version after upgrade
+                current_version = schema_manager.get_current_version()
+                self._logger.info(f"Database initialized with schema version {current_version}")
                 
-            # Check schema version
-            cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'")
-            has_version_table = cursor.fetchone() is not None
-            
-            if has_version_table:
-                # Get current schema version
-                cursor = conn.execute("SELECT MAX(version) AS version FROM schema_version")
-                row = cursor.fetchone()
-                current_version = row['version'] if row and row['version'] is not None else 0
+                # Verify schema
+                is_valid, issues = schema_manager.verify_schema()
+                if not is_valid:
+                    self._logger.warning(f"Schema validation found issues: {json.dumps(issues)}")
             else:
-                current_version = 0
+                self._logger.error("Failed to upgrade database schema")
+                raise RuntimeError("Failed to upgrade database schema")
                 
-            # Run migrations if needed
-            if current_version < self.SCHEMA_VERSION:
-                self._run_migrations(current_version)
-                
-            # Commit changes
-            conn.commit()
-            
-            self._logger.info(f"Database initialized with schema version {self.SCHEMA_VERSION}")
-            
         except Exception as e:
             self._logger.error(f"Failed to initialize database: {e}")
             if self._conn:
                 self._conn.rollback()
-            raise
-            
-    def _run_migrations(self, current_version: int):
-        """
-        Run database migrations to update schema.
-        
-        Args:
-            current_version: Current schema version
-        """
-        conn = self.connect()
-        
-        try:
-            # Run migrations from current_version+1 to SCHEMA_VERSION
-            for version in range(current_version + 1, self.SCHEMA_VERSION + 1):
-                self._logger.info(f"Running migration to version {version}")
-                
-                # Run migration method for this version
-                migration_method = getattr(self, f"_migrate_to_v{version}", None)
-                description = ""
-                
-                if migration_method:
-                    description = migration_method(conn)
-                else:
-                    self._logger.warning(f"No migration method found for version {version}")
-                    
-                # Record migration
-                conn.execute(
-                    "INSERT INTO schema_version (version, applied_at, description) VALUES (?, ?, ?)",
-                    (version, datetime.datetime.now().isoformat(), description)
-                )
-                
-            # Commit changes
-            conn.commit()
-            
-        except Exception as e:
-            self._logger.error(f"Migration failed: {e}")
-            conn.rollback()
-            raise
-            
-    def _migrate_to_v1(self, conn: sqlite3.Connection) -> str:
-        """
-        Migrate database to version 1.
-        
-        Args:
-            conn: Database connection
-            
-        Returns:
-            Migration description
-        """
-        # This is a placeholder for a real migration
-        return "Initial schema"
-        
-    def _migrate_to_v2(self, conn: sqlite3.Connection) -> str:
-        """
-        Migrate database to version 2.
-        
-        Args:
-            conn: Database connection
-            
-        Returns:
-            Migration description
-        """
-        # Add updated_at column to attachments table if it doesn't exist
-        try:
-            conn.execute("SELECT updated_at FROM attachments LIMIT 1")
-        except sqlite3.OperationalError:
-            conn.execute("ALTER TABLE attachments ADD COLUMN updated_at TIMESTAMP")
-            
-        return "Add updated_at to attachments table"
-    
-    def _migrate_to_v3(self, conn: sqlite3.Connection) -> str:
-        """
-        Migrate database to version 3.
-        
-        This migration ensures the forms table has the proper columns needed by
-        the enhanced form models and form model registry, fixing schema discrepancies.
-        
-        Args:
-            conn: Database connection
-            
-        Returns:
-            Migration description
-        """
-        try:
-            # Do not close the connection in the migration function
-            # Create forms table if it doesn't exist
-            conn.execute("""
-            CREATE TABLE IF NOT EXISTS forms (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                form_id TEXT UNIQUE NOT NULL,
-                incident_id TEXT,
-                op_period_id TEXT,
-                form_type TEXT NOT NULL,
-                title TEXT,
-                creator_id TEXT,
-                status TEXT DEFAULT 'draft',
-                state TEXT DEFAULT 'draft',
-                data TEXT,
-                created_at TEXT,
-                updated_at TEXT,
-                created_by TEXT,
-                updated_by TEXT
-            )
-            """)
-            
-            # Get column names
-            cursor = conn.execute("PRAGMA table_info(forms)")
-            columns = [column['name'] for column in cursor.fetchall()]
-            
-            # Add form_id column if missing
-            if 'form_id' not in columns:
-                conn.execute("ALTER TABLE forms ADD COLUMN form_id TEXT UNIQUE")
-                
-            # Add data column if missing
-            if 'data' not in columns:
-                conn.execute("ALTER TABLE forms ADD COLUMN data TEXT")
-                
-            # Add state column if missing
-            if 'state' not in columns:
-                conn.execute("ALTER TABLE forms ADD COLUMN state TEXT DEFAULT 'draft'")
-                
-            # Add title column if missing
-            if 'title' not in columns:
-                conn.execute("ALTER TABLE forms ADD COLUMN title TEXT")
-            
-            # Create form_versions table if it doesn't exist
-            conn.execute("""
-            CREATE TABLE IF NOT EXISTS form_versions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                form_id TEXT NOT NULL,
-                version_number INTEGER NOT NULL,
-                version_id TEXT,
-                content TEXT,
-                created_by TEXT,
-                created_at TEXT,
-                UNIQUE(form_id, version_number)
-            )
-            """)
-            
-            conn.commit()
-            return "Updated forms table schema to fix discrepancies"
-            
-        except Exception as e:
-            self._logger.error(f"Error updating forms table schema: {e}")
             raise
         
     def create_backup(self) -> Optional[str]:
@@ -405,6 +259,17 @@ class DBManager:
         except Exception as e:
             self._logger.error(f"Failed to create backup: {e}")
             return None
+            
+    def verify_schema(self) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Verify the database schema against the expected schema.
+        
+        Returns:
+            Tuple of (is_valid, issues) where is_valid is True if the schema is valid,
+            and issues is a dictionary containing any issues found.
+        """
+        schema_manager = SchemaManager(self._db_path)
+        return schema_manager.verify_schema()
             
     def execute(self, query: str, params: Union[Tuple, Dict] = (), commit: bool = False) -> sqlite3.Cursor:
         """
@@ -499,13 +364,29 @@ class DBManager:
         Returns:
             Current schema version
         """
+        schema_manager = SchemaManager(self._db_path)
+        return schema_manager.get_current_version()
+        
+    def get_schema_history(self) -> List[Dict[str, Any]]:
+        """
+        Get the schema migration history.
+        
+        Returns:
+            List of schema migrations with version, applied_at, and description
+        """
         try:
             conn = self.connect()
-            cursor = conn.execute("SELECT MAX(version) AS version FROM schema_version")
-            row = cursor.fetchone()
-            return row['version'] if row and row['version'] is not None else 0
-        except Exception:
-            return 0
+            cursor = conn.execute(
+                """
+                SELECT version, applied_at, description
+                FROM schema_version
+                ORDER BY version
+                """
+            )
+            return [dict(row) for row in cursor.fetchall()]
+        except Exception as e:
+            self._logger.error(f"Failed to get schema history: {e}")
+            return []
 
 
 # Create a DatabaseManager class reference for backwards compatibility
