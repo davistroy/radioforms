@@ -177,7 +177,6 @@ performance-results/
 
 # Documentation builds
 docs/_build/
-docs/api/
 
 # Package builds
 *.whl

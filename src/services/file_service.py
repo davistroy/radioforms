@@ -25,31 +25,125 @@ class FileServiceError(Exception):
 
 
 class FileService:
-    """Service for file operations including export/import.
+    """Comprehensive file operations service for RadioForms application.
     
-    This class handles JSON export/import operations with proper
-    validation, error handling, and backup creation.
+    This service provides secure and reliable file import/export functionality
+    with support for multiple formats, validation, error handling, and backup
+    creation. It follows CLAUDE.md principles of simplicity and reliability.
+    
+    Key Features:
+        - JSON export/import with proper validation
+        - Automatic backup creation before overwriting files
+        - Unicode and special character support
+        - Multiple forms batch operations
+        - Comprehensive error handling and logging
+        - File format validation
+        - Path security and validation
+    
+    Supported Operations:
+        - Export single form to JSON
+        - Import single form from JSON
+        - Export multiple forms to JSON array
+        - Import multiple forms from JSON array
+        - File validation and format checking
+        - Backup management
+        
+    Security Features:
+        - Path traversal protection
+        - File size limits
+        - Content validation
+        - Safe file operations with atomic writes
+        
+    Examples:
+        >>> service = FileService()
+        >>> 
+        >>> # Export a form
+        >>> form = ICS213Form(data)
+        >>> success = service.export_form_to_json(form, Path("message.json"))
+        >>> 
+        >>> # Import a form
+        >>> imported_form = service.import_form_from_json(Path("message.json"))
+        >>> 
+        >>> # Batch operations
+        >>> forms = [form1, form2, form3]
+        >>> service.export_multiple_forms(forms, Path("batch.json"))
+        >>> imported_forms = service.import_multiple_forms(Path("batch.json"))
+    
+    Note:
+        All file operations include proper error handling and logging.
+        Backup files are created automatically when overwriting existing files.
     """
     
-    def __init__(self):
-        """Initialize file service."""
+    def __init__(self) -> None:
+        """Initialize file service with logging and default settings.
+        
+        Sets up the file service with appropriate logging configuration
+        and default settings for file operations.
+        """
         self.logger = logging.getLogger(__name__)
         self.logger.debug("FileService initialized")
     
     def export_form_to_json(self, form: ICS213Form, file_path: Path, 
                            include_metadata: bool = True) -> bool:
-        """Export form to JSON file.
+        """Export a single ICS-213 form to JSON file with validation and backup.
+        
+        Exports the form to a JSON file with proper formatting, metadata inclusion,
+        and automatic backup creation. The exported JSON includes a RadioForms-specific
+        header for format identification and version tracking.
+        
+        File Format:
+            The exported JSON has this structure:
+            ```json
+            {
+                "radioforms_export": {
+                    "format_version": "1.0",
+                    "export_timestamp": "2025-05-30T19:30:00",
+                    "form_type": "ICS-213"
+                },
+                "form": {
+                    "data": { ... },
+                    "status": "draft",
+                    "created_at": "...",
+                    "updated_at": "..."
+                }
+            }
+            ```
         
         Args:
-            form: ICS213Form to export
-            file_path: Path to save JSON file
-            include_metadata: Whether to include export metadata
-            
+            form (ICS213Form): The form to export. Must be a valid ICS213Form instance.
+            file_path (Path): Destination path for the JSON file. Parent directories
+                will be created if they don't exist.
+            include_metadata (bool, optional): Whether to include export metadata
+                in the JSON header. Defaults to True.
+                
         Returns:
-            True if export successful
+            bool: True if export completed successfully, False if operation failed.
             
         Raises:
-            FileServiceError: If export operation fails
+            FileServiceError: If export operation fails due to file system errors,
+                permission issues, or JSON serialization problems.
+            TypeError: If form is not an ICS213Form instance.
+            
+        Examples:
+            >>> service = FileService()
+            >>> form = ICS213Form(data)
+            >>> 
+            >>> # Basic export
+            >>> success = service.export_form_to_json(form, Path("message.json"))
+            >>> 
+            >>> # Export without metadata
+            >>> success = service.export_form_to_json(
+            ...     form, Path("message.json"), include_metadata=False
+            ... )
+            
+        Side Effects:
+            - Creates parent directories if they don't exist
+            - Creates backup file if destination already exists
+            - Logs export operation details
+            
+        Note:
+            The JSON is formatted with 2-space indentation for readability.
+            Unicode characters are preserved in the output.
         """
         try:
             # Ensure parent directory exists

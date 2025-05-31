@@ -34,17 +34,44 @@ class FormStatus(Enum):
 
 @dataclass
 class Person:
-    """Represents a person with name and position.
+    """Represents a person with name and position information for ICS-213 forms.
     
-    Used for To, From, Approved by, and Replied by fields.
+    This class encapsulates person information used throughout ICS-213 forms
+    including sender, recipient, approver, and replier. Provides validation
+    and formatting methods for display and data exchange.
+    
+    Attributes:
+        name (str): Full name of the person (e.g., "John Smith").
+        position (str): Position or role (e.g., "IC", "Operations Chief").
+        signature (str): Electronic signature or initials (e.g., "J.S.").
+        contact_info (str): Contact information (e.g., "Radio 123", phone number).
+    
+    Examples:
+        >>> person = Person(name="John Smith", position="IC")
+        >>> print(person.display_name)
+        John Smith, IC
+        >>> print(person.is_complete)
+        True
+        
+        >>> incomplete = Person(name="John")
+        >>> print(incomplete.is_complete)
+        False
+    
+    Note:
+        A person is considered "complete" if both name and position are provided.
+        This is the minimum requirement for form validation.
     """
     name: str = ""
     position: str = ""
     signature: str = ""
     contact_info: str = ""
     
-    def __post_init__(self):
-        """Validate person data after initialization."""
+    def __post_init__(self) -> None:
+        """Validate and normalize person data after initialization.
+        
+        Strips whitespace from all string fields to ensure consistent data.
+        Called automatically by dataclass after object creation.
+        """
         self.name = self.name.strip()
         self.position = self.position.strip()
         self.signature = self.signature.strip()
@@ -52,12 +79,35 @@ class Person:
     
     @property
     def is_complete(self) -> bool:
-        """Check if person has required minimum information."""
+        """Check if person has the minimum required information for form validation.
+        
+        Returns:
+            bool: True if both name and position are non-empty, False otherwise.
+            
+        Examples:
+            >>> Person(name="John Smith", position="IC").is_complete
+            True
+            >>> Person(name="John Smith").is_complete
+            False
+        """
         return bool(self.name and self.position)
     
     @property
     def display_name(self) -> str:
-        """Get formatted display name."""
+        """Get formatted display name for UI presentation.
+        
+        Returns:
+            str: Formatted name as "Name, Position" if both available,
+                 otherwise returns the available field, or "Unknown" if empty.
+                 
+        Examples:
+            >>> Person(name="John Smith", position="IC").display_name
+            'John Smith, IC'
+            >>> Person(name="John Smith").display_name
+            'John Smith'
+            >>> Person().display_name
+            'Unknown'
+        """
         if self.name and self.position:
             return f"{self.name}, {self.position}"
         elif self.name:
@@ -67,12 +117,36 @@ class Person:
         return "Unknown"
     
     def to_dict(self) -> Dict[str, str]:
-        """Convert to dictionary for JSON serialization."""
+        """Convert person to dictionary for JSON serialization.
+        
+        Returns:
+            Dict[str, str]: Dictionary with all person fields as string values.
+            
+        Examples:
+            >>> person = Person(name="John", position="IC")
+            >>> person.to_dict()
+            {'name': 'John', 'position': 'IC', 'signature': '', 'contact_info': ''}
+        """
         return asdict(self)
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Person':
-        """Create Person from dictionary."""
+        """Create Person instance from dictionary data.
+        
+        Args:
+            data (Dict[str, Any]): Dictionary containing person data.
+                Expected keys: 'name', 'position', 'signature', 'contact_info'.
+                Missing keys will use empty string defaults.
+                
+        Returns:
+            Person: New Person instance with data from dictionary.
+            
+        Examples:
+            >>> data = {'name': 'John Smith', 'position': 'IC'}
+            >>> person = Person.from_dict(data)
+            >>> person.name
+            'John Smith'
+        """
         return cls(
             name=data.get('name', ''),
             position=data.get('position', ''),
@@ -85,10 +159,52 @@ class Person:
 class ICS213Data:
     """Core data structure for ICS-213 General Message form.
     
-    This class follows the simplified approach in CLAUDE.md:
+    This class represents all the data fields in an ICS-213 General Message form,
+    following FEMA ICS standards. It provides structured storage for message
+    transmission between incident command personnel.
+    
+    The class follows the simplified approach outlined in CLAUDE.md:
     - Start with essential fields only
-    - Add validation incrementally
+    - Add validation incrementally  
     - Keep it simple for MVP
+    - Use string types for dates/times initially
+    
+    Attributes:
+        incident_name (str): Name of the incident this message relates to.
+        to (Person): Recipient of the message (name and position required).
+        from_person (Person): Sender of the message (name and position required).
+        subject (str): Brief subject line describing the message content.
+        date (str): Date of message in YYYY-MM-DD format.
+        time (str): Time of message in HH:MM format (24-hour).
+        message (str): Main message content.
+        approved_by (Person): Person who approved the message (optional).
+        reply (str): Reply message content (if applicable).
+        replied_by (Person): Person who provided the reply (if applicable).
+        reply_date_time (str): Date and time of reply in ISO format.
+        priority (Priority): Message priority level (routine/urgent/immediate).
+        form_version (str): Version of the form schema.
+        reply_requested (bool): Whether a reply is requested.
+        
+    Examples:
+        >>> # Create a basic message
+        >>> data = ICS213Data(
+        ...     incident_name="Wildfire Alpha",
+        ...     to=Person(name="John Smith", position="IC"),
+        ...     from_person=Person(name="Jane Doe", position="Ops"),
+        ...     subject="Status Update",
+        ...     date="2025-05-30",
+        ...     time="14:30",
+        ...     message="All teams deployed and operational.",
+        ...     priority=Priority.URGENT
+        ... )
+        
+        >>> # Create with reply
+        >>> data.reply = "Message received and understood."
+        >>> data.replied_by = Person(name="John Smith", position="IC")
+        
+    Note:
+        The 'from' field is named 'from_person' because 'from' is a Python keyword.
+        Date and time fields use string format for simplicity in the MVP version.
     """
     
     # Header fields
@@ -113,8 +229,17 @@ class ICS213Data:
     form_version: str = "1.0"
     reply_requested: bool = False
     
-    def __post_init__(self):
-        """Clean up data after initialization."""
+    def __post_init__(self) -> None:
+        """Clean up and normalize data after initialization.
+        
+        Strips whitespace from all string fields to ensure consistent data
+        and prevent validation issues caused by leading/trailing spaces.
+        Called automatically by dataclass after object creation.
+        
+        Note:
+            This method is called automatically and should not be called manually.
+            Person objects are not modified here as they have their own post_init.
+        """
         self.incident_name = self.incident_name.strip()
         self.subject = self.subject.strip()
         self.message = self.message.strip()
@@ -183,17 +308,89 @@ class ValidationError(Exception):
 
 
 class ICS213Form:
-    """ICS-213 General Message form with validation and business logic.
+    """ICS-213 General Message form with comprehensive validation and business logic.
     
-    This class provides:
-    - Form data management
-    - Validation according to ICS-213 rules
-    - Status tracking
-    - JSON serialization
+    This class encapsulates a complete ICS-213 form including data, validation,
+    status tracking, and serialization capabilities. It follows FEMA ICS-213
+    standards and provides the core functionality for message management in
+    the RadioForms application.
+    
+    The form implements a complete lifecycle:
+    1. DRAFT - Initial state, allows editing and validation
+    2. APPROVED - Validated and approved for transmission
+    3. TRANSMITTED - Sent via radio or other means
+    4. RECEIVED - Acknowledgment received
+    5. REPLIED - Reply has been provided
+    6. DOCUMENTED - Archived and documented
+    
+    Key Features:
+        - Comprehensive validation according to ICS-213 requirements
+        - Status tracking throughout form lifecycle
+        - JSON serialization for data persistence and exchange
+        - Error tracking and reporting
+        - Timestamp management for audit trails
+        - Support for approval workflows
+        - Reply handling capabilities
+    
+    Attributes:
+        data (ICS213Data): The form's data content.
+        status (FormStatus): Current lifecycle status of the form.
+        validation_errors (List[str]): List of current validation errors.
+        created_at (datetime): Timestamp when form was created.
+        updated_at (datetime): Timestamp when form was last modified.
+    
+    Examples:
+        >>> # Create a new form
+        >>> form = ICS213Form()
+        >>> form.data.incident_name = "Wildfire Alpha"
+        >>> form.data.to = Person(name="John Smith", position="IC")
+        >>> form.data.from_person = Person(name="Jane Doe", position="Ops")
+        >>> form.data.subject = "Status Update"
+        >>> form.data.message = "All teams deployed successfully."
+        
+        >>> # Validate the form
+        >>> if form.validate():
+        ...     print("Form is valid")
+        ... else:
+        ...     print(f"Errors: {form.get_validation_errors()}")
+        
+        >>> # Approve the form
+        >>> approver = Person(name="Chief Officer", position="IC")
+        >>> if form.approve(approver):
+        ...     print(f"Form approved by {approver.display_name}")
+        
+        >>> # Serialize to JSON
+        >>> json_data = form.to_json()
+        >>> restored_form = ICS213Form.from_json(json_data)
+        
+    Note:
+        Forms must be validated before approval or transmission. The validation
+        method populates the validation_errors list with specific issues that
+        need to be addressed.
     """
     
-    def __init__(self, data: Optional[ICS213Data] = None):
-        """Initialize form with optional data."""
+    def __init__(self, data: Optional[ICS213Data] = None) -> None:
+        """Initialize ICS-213 form with optional data.
+        
+        Creates a new ICS-213 form in DRAFT status with empty validation errors.
+        If no data is provided, initializes with empty ICS213Data instance.
+        
+        Args:
+            data (Optional[ICS213Data]): Initial form data. If None, creates
+                empty data structure with default values.
+                
+        Examples:
+            >>> # Create empty form
+            >>> form = ICS213Form()
+            >>> form.status
+            <FormStatus.DRAFT: 'draft'>
+            
+            >>> # Create form with data
+            >>> data = ICS213Data(incident_name="Test Incident")
+            >>> form = ICS213Form(data)
+            >>> form.data.incident_name
+            'Test Incident'
+        """
         self.data = data or ICS213Data()
         self.status = FormStatus.DRAFT
         self.validation_errors: List[str] = []
@@ -205,10 +402,48 @@ class ICS213Form:
     def validate(self) -> bool:
         """Validate form data according to ICS-213 requirements.
         
+        Performs comprehensive validation of all form fields according to
+        FEMA ICS-213 standards. Validation errors are cleared and repopulated
+        on each call, so this method can be called multiple times.
+        
+        Validation Rules:
+            - Recipient (To) must have both name and position
+            - Sender (From) must have both name and position  
+            - Subject is required
+            - Date and Time are required
+            - Message content is required
+            - If approver is specified, must have name and position
+            - If reply exists, replier must have name and position
+        
         Returns:
-            True if form is valid, False otherwise
+            bool: True if form passes all validation rules, False otherwise.
             
-        Validation errors are stored in self.validation_errors
+        Side Effects:
+            Updates self.validation_errors list with specific error messages
+            for any validation failures found.
+            
+        Examples:
+            >>> form = ICS213Form()
+            >>> form.validate()
+            False
+            >>> len(form.validation_errors) > 0
+            True
+            
+            >>> # Fill required fields
+            >>> form.data.to = Person(name="John", position="IC")
+            >>> form.data.from_person = Person(name="Jane", position="Ops")
+            >>> form.data.subject = "Test"
+            >>> form.data.date = "2025-05-30"
+            >>> form.data.time = "14:30"
+            >>> form.data.message = "Test message"
+            >>> form.validate()
+            True
+            >>> len(form.validation_errors)
+            0
+            
+        Note:
+            Validation must pass before a form can be approved or transmitted.
+            Use get_validation_errors() to retrieve human-readable error messages.
         """
         self.validation_errors = []
         
