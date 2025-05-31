@@ -1246,9 +1246,9 @@ Test Requirements:
 - Graceful fallback ensures functionality in any environment
 
 **Outstanding Items for Phase 5 Readiness**:
-- GUI integration of template system with main application
-- Form collection expansion using template infrastructure
-- User testing and validation of template-based workflow
+- [x] GUI integration of template system with main application (Task 21.1 Complete)
+- [ ] Form collection expansion using template infrastructure (Task 21.2 Next)
+- [ ] User testing and validation of template-based workflow (Task 22.1 Planned)
 
 ### Week 21: GUI Integration & Template System Deployment
 
@@ -1294,13 +1294,13 @@ Test Requirements:
 - Comprehensive integration testing validates 100% functionality
 - Graceful error handling for template widget creation and dependency management
 
-#### Task 21.2: Form Collection Expansion Using Template System
+#### Task 21.2: Form Collection Expansion Using Template System ⏳ IN PROGRESS
 **Claude Code Instructions:**
 ```
 Rapidly implement high-demand forms using template system:
-1. ICS-201 Incident Briefing template (87% user demand)
-2. ICS-202 Incident Objectives template (85% user demand)  
-3. ICS-203 Organization Assignment List template (78% user demand)
+1. ICS-202 Incident Objectives template (85% user demand) - Start first (simplest)
+2. ICS-201 Incident Briefing template (87% user demand) - Second priority
+3. ICS-203 Organization Assignment List template (78% user demand) - Third priority
 4. Form factory registration for new templates
 5. Integration testing for complete form collection
 
@@ -1311,6 +1311,12 @@ Template Development Requirements:
 - Professional PDF export layouts
 - Complete data import/export functionality
 
+Implementation Strategy (CLAUDE.md compliant):
+- Start with ICS-202 (simplest form with highest ROI)
+- One form at a time, completely functional before next
+- Test each form thoroughly before proceeding
+- Validate template system ROI with each addition
+
 Test Requirements:
 - Template functionality tests for each new form
 - Cross-form data consistency tests
@@ -1320,9 +1326,9 @@ Test Requirements:
 ```
 
 **Success Criteria:**
-- [ ] ICS-201 template fully implemented and tested
-- [ ] ICS-202 template fully implemented and tested
-- [ ] ICS-203 template fully implemented and tested
+- [ ] ICS-202 template fully implemented and tested (Starting now)
+- [ ] ICS-201 template fully implemented and tested (Next priority)
+- [ ] ICS-203 template fully implemented and tested (Third priority)
 - [ ] 6+ forms operational (meeting Phase 4 validation gate requirement)
 - [ ] Template development time <50% of custom development (ROI validation)
 

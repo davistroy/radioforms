@@ -499,6 +499,25 @@ def create_ics205_widget(form_service=None, parent: Optional[QWidget] = None, **
         return TemplateFormWidget(None, form_service, parent)
 
 
+def create_ics202_widget(form_service=None, parent: Optional[QWidget] = None, **kwargs) -> TemplateFormWidget:
+    """Convenience function for creating ICS-202 template widget.
+    
+    Args:
+        form_service: Optional form service for database operations
+        parent: Parent widget
+        **kwargs: Arguments to pass to ICS202Template constructor
+        
+    Returns:
+        TemplateFormWidget: New ICS-202 template form widget
+    """
+    try:
+        from .forms.templates.ics202_template import ICS202Template
+        return create_template_form_widget(ICS202Template, form_service, parent, **kwargs)
+    except ImportError as e:
+        logger.error(f"Failed to import ICS202Template: {e}")
+        return TemplateFormWidget(None, form_service, parent)
+
+
 # Registration helper for form factory integration
 
 def register_template_forms():
