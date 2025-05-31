@@ -11,6 +11,15 @@ from dataclasses import dataclass, field, asdict
 from typing import Optional, Dict, Any, List
 from enum import Enum
 
+# Import base form interface
+try:
+    from ..models.base_form import BaseForm, FormType, FormValidationResult
+except ImportError:
+    # For standalone testing
+    import sys
+    sys.path.append('.')
+    from src.models.base_form import BaseForm, FormType, FormValidationResult
+
 
 logger = logging.getLogger(__name__)
 
@@ -307,7 +316,7 @@ class ValidationError(Exception):
     pass
 
 
-class ICS213Form:
+class ICS213Form(BaseForm):
     """ICS-213 General Message form with comprehensive validation and business logic.
     
     This class encapsulates a complete ICS-213 form including data, validation,
@@ -391,6 +400,11 @@ class ICS213Form:
             >>> form.data.incident_name
             'Test Incident'
         """
+        # Initialize base form
+        super().__init__()
+        self.metadata.form_type = FormType.ICS_213
+        
+        # Initialize ICS-213 specific data
         self.data = data or ICS213Data()
         self.status = FormStatus.DRAFT
         self.validation_errors: List[str] = []
@@ -624,3 +638,124 @@ class ICS213Form:
                 f"from={self.data.from_person.display_name}, "
                 f"to={self.data.to.display_name}, "
                 f"subject='{self.data.subject}')")
+    
+    # BaseForm interface implementation
+    
+    def get_form_type(self) -> FormType:
+        """Get the type of this form.
+        
+        Returns:
+            FormType: The ICS-213 form type.
+        """
+        return FormType.ICS_213
+    
+    def is_valid(self) -> bool:
+        """Check if the form data is valid.
+        
+        Returns:
+            bool: True if form is valid, False otherwise.
+        """
+        return self.validate()
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert form to dictionary representation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary containing all form data.
+        """
+        return {
+            'form_type': 'ICS-213',
+            'status': self.status.value,
+            'validation_errors': self.validation_errors.copy(),
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat(),
+            'data': asdict(self.data)
+        }
+    
+    def from_dict(self, data: Dict[str, Any]) -> None:
+        """Load form data from dictionary representation.
+        
+        Args:
+            data: Dictionary containing form data.
+        """
+        # Load status
+        if 'status' in data:
+            try:
+                self.status = FormStatus(data['status'])
+            except ValueError:
+                self.status = FormStatus.DRAFT
+        
+        # Load timestamps
+        if 'created_at' in data:
+            try:
+                self.created_at = datetime.fromisoformat(data['created_at'])
+            except ValueError:
+                pass
+        
+        if 'updated_at' in data:
+            try:
+                self.updated_at = datetime.fromisoformat(data['updated_at'])
+            except ValueError:
+                pass
+        
+        # Load validation errors
+        self.validation_errors = data.get('validation_errors', [])
+        
+        # Load form data
+        if 'data' in data:
+            self.data = ICS213Data.from_dict(data['data'])
+    
+    def validate_detailed(self) -> FormValidationResult:
+        """Perform detailed validation with specific error information.
+        
+        Returns:
+            FormValidationResult: Detailed validation result.
+        """
+        result = FormValidationResult()
+        
+        # Clear and repopulate validation errors
+        self.validation_errors.clear()
+        
+        # Check recipient
+        if not self.data.to.name.strip():
+            error = "Recipient name is required"
+            self.validation_errors.append(error)
+            result.add_error(error, 'to_name')
+        
+        if not self.data.to.position.strip():
+            error = "Recipient position is required"
+            self.validation_errors.append(error)
+            result.add_error(error, 'to_position')
+        
+        # Check sender
+        if not self.data.from_person.name.strip():
+            error = "Sender name is required"
+            self.validation_errors.append(error)
+            result.add_error(error, 'from_name')
+        
+        if not self.data.from_person.position.strip():
+            error = "Sender position is required"
+            self.validation_errors.append(error)
+            result.add_error(error, 'from_position')
+        
+        # Check subject
+        if not self.data.subject.strip():
+            error = "Subject is required"
+            self.validation_errors.append(error)
+            result.add_error(error, 'subject')
+        
+        # Check message
+        if not self.data.message.strip():
+            error = "Message content is required"
+            self.validation_errors.append(error)
+            result.add_error(error, 'message')
+        
+        # Check approved_by if specified
+        if self.data.approved_by.name.strip() and not self.data.approved_by.position.strip():
+            error = "Approved by position is required when approved by name is specified"
+            self.validation_errors.append(error)
+            result.add_error(error, 'approved_by_position')
+        
+        result.is_valid = len(self.validation_errors) == 0
+        
+        return result

@@ -65,14 +65,16 @@ from datetime import datetime, date, time
 from typing import List, Optional, Dict, Any, Union
 from pathlib import Path
 
-# Import shared person class from ICS-213
+# Import shared person class from ICS-213 and base form interface
 try:
     from ..forms.ics213 import Person
+    from .base_form import BaseForm, FormType, FormValidationResult
 except ImportError:
     # For standalone testing, import from absolute path
     import sys
     sys.path.append('.')
     from src.forms.ics213 import Person
+    from src.models.base_form import BaseForm, FormType, FormValidationResult
 
 
 @dataclass
@@ -723,8 +725,7 @@ class ICS214Data:
         }
 
 
-@dataclass
-class ICS214Form:
+class ICS214Form(BaseForm):
     """Complete ICS-214 form with UI integration capabilities.
     
     This class extends ICS214Data with additional functionality for UI integration,
@@ -745,15 +746,23 @@ class ICS214Form:
         >>> form.add_tag("training")
     """
     
-    data: ICS214Data = field(default_factory=ICS214Data)
-    form_id: str = ""
-    status: str = "draft"  # draft, completed, submitted, archived
-    tags: List[str] = field(default_factory=list)
-    
-    def __post_init__(self) -> None:
-        """Post-initialization setup."""
+    def __init__(self, data: Optional[ICS214Data] = None) -> None:
+        """Initialize ICS-214 form with optional data.
+        
+        Args:
+            data: Optional ICS214Data instance to initialize with.
+        """
+        # Initialize base form
+        super().__init__()
+        self.metadata.form_type = FormType.ICS_214
+        
+        # Initialize ICS-214 specific data
+        self.data = data or ICS214Data()
+        self.form_id = ""
+        self.status = "draft"  # draft, completed, submitted, archived
+        
+        # Generate unique form ID based on timestamp
         if not self.form_id:
-            # Generate unique form ID based on timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
             self.form_id = f"ics214_{timestamp}"
     
@@ -781,76 +790,78 @@ class ICS214Form:
             return True
         return False
     
-    def add_tag(self, tag: str) -> bool:
-        """Add a tag to the form.
-        
-        Args:
-            tag: Tag to add to the form.
-            
-        Returns:
-            bool: True if tag was added, False if already exists.
-        """
-        tag = tag.strip().lower()
-        if tag and tag not in self.tags:
-            self.tags.append(tag)
-            return True
-        return False
+    # Tag methods inherited from BaseForm
     
-    def remove_tag(self, tag: str) -> bool:
-        """Remove a tag from the form.
-        
-        Args:
-            tag: Tag to remove from the form.
-            
-        Returns:
-            bool: True if tag was removed, False if not found.
-        """
-        tag = tag.strip().lower()
-        if tag in self.tags:
-            self.tags.remove(tag)
-            return True
-        return False
+    # JSON serialization inherited from BaseForm
     
-    def to_json(self) -> str:
-        """Serialize complete form to JSON.
+    # JSON deserialization inherited from BaseForm
+    
+    # BaseForm interface implementation
+    
+    def get_form_type(self) -> FormType:
+        """Get the type of this form.
         
         Returns:
-            str: JSON representation of the complete form.
+            FormType: The ICS-214 form type.
+        """
+        return FormType.ICS_214
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert form to dictionary representation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary containing all form data.
         """
         form_dict = self.data.to_dict()
         form_dict.update({
             'form_id': self.form_id,
             'status': self.status,
-            'tags': self.tags
         })
-        return json.dumps(form_dict, indent=2)
+        return form_dict
     
-    @classmethod
-    def from_json(cls, json_data: str) -> ICS214Form:
-        """Create ICS214Form from JSON representation.
+    def from_dict(self, data: Dict[str, Any]) -> None:
+        """Load form data from dictionary representation.
         
         Args:
-            json_data: JSON string containing complete form data.
-            
-        Returns:
-            ICS214Form: New form instance from JSON data.
+            data: Dictionary containing form data.
         """
-        data_dict = json.loads(json_data)
-        
         # Extract form metadata
-        form_id = data_dict.pop('form_id', '')
-        status = data_dict.pop('status', 'draft')
-        tags = data_dict.pop('tags', [])
+        self.form_id = data.pop('form_id', '')
+        self.status = data.pop('status', 'draft')
         
-        # Create data model from remaining data
-        form_data = ICS214Data.from_json(json.dumps(data_dict))
+        # Load form data
+        self.data = ICS214Data.from_json(json.dumps(data))
+    
+    def validate_detailed(self) -> FormValidationResult:
+        """Perform detailed validation with specific error information.
         
-        return cls(
-            data=form_data,
-            form_id=form_id,
-            status=status,
-            tags=tags
-        )
+        Returns:
+            FormValidationResult: Detailed validation result.
+        """
+        result = FormValidationResult()
+        
+        # Use existing validation logic from data model
+        if self.data.is_valid():
+            result.is_valid = True
+        else:
+            result.is_valid = False
+            result.add_error("Form data validation failed")
+            
+            # Add specific validation errors based on data model validation
+            if not self.data.incident_name.strip():
+                result.add_error("Incident name is required", "incident_name")
+            if not self.data.name.strip():
+                result.add_error("Name is required", "name")
+            if not self.data.ics_position.strip():
+                result.add_error("ICS position is required", "ics_position")
+            if not self.data.home_agency.strip():
+                result.add_error("Home agency is required", "home_agency")
+            if len(self.data.activity_log) == 0:
+                result.add_error("At least one activity entry is required", "activity_log")
+            if not self.data.prepared_by.name.strip():
+                result.add_error("Prepared by name is required", "prepared_by_name")
+        
+        return result
 
 
 # Factory functions for creating forms
@@ -889,7 +900,9 @@ def load_ics214_from_json(json_data: str) -> ICS214Form:
         >>> form = load_ics214_from_json(json_str)
         >>> print(form.data.incident_name)
     """
-    return ICS214Form.from_json(json_data)
+    form = ICS214Form()
+    form.from_json(json_data)
+    return form
 
 
 def validate_activity_sequence(activities: List[ActivityEntry]) -> bool:
