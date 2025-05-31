@@ -65,15 +65,84 @@ class HeadlessApplication:
         self.database_path = database_path or Path("radioforms_headless.db")
         self.debug = debug
         
-        # Initialize database
+        # Initialize database and schema
         self.db_manager = DatabaseManager(self.database_path)
+        self._initialize_database()
         
-        # Initialize services and database tables
+        # Initialize services 
         self.multi_form_service = MultiFormService(self.db_manager)
-        self.multi_form_service.initialize()  # Create database tables
+        try:
+            self.multi_form_service.initialize()  # Create database tables
+        except Exception as e:
+            logger.warning(f"Multi-form service initialization issue: {e}")
+            # Continue anyway for basic functionality
+        
         self.search_service = EnhancedSearchService(self.db_manager, self.multi_form_service)
         
         logger.info(f"Headless application initialized with database: {self.database_path}")
+    
+    def _initialize_database(self) -> None:
+        """Initialize database schema."""
+        try:
+            from ..database.schema import create_schema
+            create_schema(self.db_manager)
+            logger.info("Database schema initialized")
+        except Exception as e:
+            logger.warning(f"Database schema initialization issue: {e}")
+            # Try basic table creation
+            self._create_basic_tables()
+    
+    def _create_basic_tables(self) -> None:
+        """Create basic database tables."""
+        try:
+            with self.db_manager.get_connection() as conn:
+                # Create forms table
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS forms (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        form_type TEXT NOT NULL,
+                        form_number TEXT,
+                        incident_name TEXT,
+                        title TEXT,
+                        data TEXT NOT NULL,
+                        created_by TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        version INTEGER DEFAULT 1,
+                        status TEXT DEFAULT 'draft'
+                    )
+                """)
+                
+                # Create form versions table
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS form_versions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        form_id INTEGER NOT NULL,
+                        version INTEGER NOT NULL,
+                        data TEXT NOT NULL,
+                        changed_by TEXT,
+                        change_description TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (form_id) REFERENCES forms (id)
+                    )
+                """)
+                
+                # Create basic indexes
+                conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_forms_type 
+                    ON forms(form_type)
+                """)
+                
+                conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_forms_incident 
+                    ON forms(incident_name)
+                """)
+                
+                conn.commit()
+                logger.info("Basic database tables created")
+                
+        except Exception as e:
+            logger.error(f"Failed to create basic tables: {e}")
     
     def run(self) -> int:
         """Run the headless application.
@@ -242,19 +311,19 @@ class HeadlessApplication:
             logger.info(f"Database query: PASSED (found {len(forms)} forms)")
             
             # Test form creation and storage
-            test_form_data = {
-                'form_type': 'ics213',
-                'incident_name': 'Database Test',
-                'subject': 'Headless database test',
-                'message': 'Testing database functionality'
-            }
+            test_form = ICS213Form()
+            test_form.data.incident_name = "Database Test"
+            test_form.data.subject = "Headless database test"
+            test_form.data.message = "Testing database functionality"
+            test_form.data.to = Person(name="Test Recipient", position="IC")
+            test_form.data.from_person = Person(name="Test Sender", position="Testing")
             
-            form_id = self.multi_form_service.create_form('ics213', test_form_data)
+            form_id = self.multi_form_service.save_form(test_form, "Headless App")
             logger.info(f"Form creation: {'PASSED' if form_id else 'FAILED'}")
             
             if form_id:
                 # Test form retrieval
-                retrieved_form = self.multi_form_service.get_form(form_id)
+                retrieved_form = self.multi_form_service.load_form(form_id)
                 logger.info(f"Form retrieval: {'PASSED' if retrieved_form else 'FAILED'}")
             
         except Exception as e:

@@ -379,10 +379,40 @@ class FormWidgetRegistry:
             )
         except ImportError:
             pass  # ICS-214 widget not available
+        
+        try:
+            # Register ICS-205 template widget
+            try:
+                from ..template_form_widget import create_ics205_widget
+            except ImportError:
+                # Try alternative import path for testing
+                from ...ui.template_form_widget import create_ics205_widget
+            
+            self.register(
+                FormType.ICS_205,
+                create_ics205_widget,
+                "Radio Communications Plan",
+                "Radio frequency assignment and communication planning for emergency operations.",
+                "",
+                create_ics205_widget  # Use factory function as creation function
+            )
+        except ImportError as e:
+            # Log the import error for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"ICS-205 template not available: {e}")
+            pass  # ICS-205 template not available
 
 
-# Global registry instance
-_registry = FormWidgetRegistry()
+# Global registry instance (lazy initialization)
+_registry = None
+
+def _get_registry() -> FormWidgetRegistry:
+    """Get the global registry instance, creating it if necessary."""
+    global _registry
+    if _registry is None:
+        _registry = FormWidgetRegistry()
+    return _registry
 
 
 class FormWidgetFactory:
@@ -412,7 +442,7 @@ class FormWidgetFactory:
         Returns:
             QWidget: New form widget or None if type not supported.
         """
-        return _registry.create_widget(form_type, parent)
+        return _get_registry().create_widget(form_type, parent)
     
     @staticmethod
     def create_form_widget_from_data(
@@ -429,7 +459,7 @@ class FormWidgetFactory:
             QWidget: New form widget with data loaded or None if failed.
         """
         form_type = form_data.get_form_type()
-        widget = _registry.create_widget(form_type, parent)
+        widget = _get_registry().create_widget(form_type, parent)
         
         if widget and isinstance(widget, FormWidgetInterface):
             widget.load_form_data(form_data)
@@ -443,7 +473,7 @@ class FormWidgetFactory:
         Returns:
             List[FormType]: List of form types that can be created.
         """
-        return _registry.get_registered_types()
+        return _get_registry().get_registered_types()
     
     @staticmethod
     def is_form_type_available(form_type: FormType) -> bool:
@@ -455,7 +485,7 @@ class FormWidgetFactory:
         Returns:
             bool: True if form type is available.
         """
-        return _registry.is_registered(form_type)
+        return _get_registry().is_registered(form_type)
     
     @staticmethod
     def get_form_display_name(form_type: FormType) -> str:
@@ -467,7 +497,7 @@ class FormWidgetFactory:
         Returns:
             str: Display name for the form type.
         """
-        return _registry.get_display_name(form_type)
+        return _get_registry().get_display_name(form_type)
     
     @staticmethod
     def get_form_description(form_type: FormType) -> str:
@@ -479,7 +509,7 @@ class FormWidgetFactory:
         Returns:
             str: Description of the form type.
         """
-        return _registry.get_description(form_type)
+        return _get_registry().get_description(form_type)
     
     @staticmethod
     def register_form_widget(
@@ -500,7 +530,7 @@ class FormWidgetFactory:
             icon_path: Optional icon file path.
             creation_func: Optional custom creation function.
         """
-        _registry.register(
+        _get_registry().register(
             form_type, widget_class, display_name, 
             description, icon_path, creation_func
         )
@@ -512,7 +542,7 @@ class FormWidgetFactory:
         Returns:
             FormWidgetRegistry: The global registry instance.
         """
-        return _registry
+        return _get_registry()
 
 
 class FormSelectionWidget(QWidget):

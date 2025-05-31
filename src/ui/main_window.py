@@ -94,6 +94,7 @@ class MainWindow(QMainWindow):
         
         # UI components
         self.ics213_widget = None
+        self.ics205_widget = None
         self.form_service = None
         self.file_service = None
         self.db_manager = None
@@ -181,6 +182,32 @@ class MainWindow(QMainWindow):
             placeholder = QLabel("ICS-213 Form (PySide6 not available)")
             placeholder.setAlignment(Qt.AlignCenter)
             self.tab_widget.addTab(placeholder, "ICS-213 General Message")
+        
+        # Add ICS-205 template tab
+        try:
+            from .template_form_widget import create_ics205_widget
+            
+            # Initialize services if not already done
+            if not hasattr(self, 'form_service') or not self.form_service:
+                self._initialize_services()
+            
+            self.ics205_widget = create_ics205_widget(form_service=self.form_service)
+            self.tab_widget.addTab(self.ics205_widget, "ICS-205 Radio Communications Plan")
+            
+            # Connect template form signals
+            self.ics205_widget.form_changed.connect(self._on_form_changed)
+            self.ics205_widget.form_saved.connect(self._on_form_saved_signal)
+            self.ics205_widget.form_loaded.connect(self._on_form_loaded_signal)
+            self.ics205_widget.form_changed.connect(self._update_menu_states)
+            
+            self.logger.info("ICS-205 template widget added successfully")
+            
+        except ImportError as e:
+            self.logger.warning(f"ICS-205 template not available: {e}")
+            # Add placeholder for ICS-205
+            placeholder = QLabel("ICS-205 Radio Communications Plan (Template not available)")
+            placeholder.setAlignment(Qt.AlignCenter)
+            self.tab_widget.addTab(placeholder, "ICS-205 Radio Communications Plan")
         
         main_layout.addWidget(self.tab_widget)
         
@@ -985,9 +1012,28 @@ class MainWindow(QMainWindow):
         if not PYSIDE6_AVAILABLE:
             return
         
-        # Check if we have a form loaded
-        has_form = self.ics213_widget and self.ics213_widget.get_form() is not None
-        has_unsaved_changes = self.ics213_widget and self.ics213_widget.has_unsaved_changes() if has_form else False
+        # Get currently active tab
+        current_widget = None
+        if hasattr(self, 'tab_widget') and self.tab_widget:
+            current_widget = self.tab_widget.currentWidget()
+        
+        # Check if we have a form loaded in the current tab
+        has_form = False
+        has_unsaved_changes = False
+        current_priority = None
+        
+        if current_widget == self.ics213_widget and self.ics213_widget:
+            # ICS-213 form
+            has_form = self.ics213_widget.get_form() is not None
+            has_unsaved_changes = self.ics213_widget.has_unsaved_changes() if has_form else False
+            if has_form:
+                form = self.ics213_widget.get_form()
+                current_priority = getattr(form.data, 'priority', None) if form else None
+        elif current_widget == getattr(self, 'ics205_widget', None) and self.ics205_widget:
+            # ICS-205 template form
+            has_form = self.ics205_widget.get_form_data() is not None
+            has_unsaved_changes = self.ics205_widget.has_unsaved_changes() if has_form else False
+            # Note: ICS-205 doesn't have priority field
         
         # Update save action
         self.actions['save'].setEnabled(has_unsaved_changes)
@@ -1009,18 +1055,20 @@ class MainWindow(QMainWindow):
         priority_actions = ['priority_routine', 'priority_urgent', 'priority_immediate']
         for action_name in priority_actions:
             if action_name in self.actions:
-                self.actions[action_name].setEnabled(has_form)
+                # Enable priority actions only for forms that support priority (like ICS-213)
+                self.actions[action_name].setEnabled(has_form and current_priority is not None)
         
         # Update priority checkboxes based on current form
-        if has_form:
-            current_priority = self.ics213_widget.get_form().data.priority
+        if has_form and current_priority is not None:
+            from ..forms.ics213 import Priority
             self.actions['priority_routine'].setChecked(current_priority == Priority.ROUTINE)
             self.actions['priority_urgent'].setChecked(current_priority == Priority.URGENT)
             self.actions['priority_immediate'].setChecked(current_priority == Priority.IMMEDIATE)
         else:
-            # Uncheck all priority actions when no form
+            # Uncheck all priority actions when no form or form doesn't support priority
             for action_name in priority_actions:
-                self.actions[action_name].setChecked(False)
+                if action_name in self.actions:
+                    self.actions[action_name].setChecked(False)
         
         self.logger.debug(f"Menu states updated: has_form={has_form}, has_changes={has_unsaved_changes}")
     
