@@ -495,6 +495,19 @@ class ICS205Template(FormTemplate):
         
         return warnings
     
+    def validate(self) -> bool:
+        """Validate the ICS-205 form data.
+        
+        Returns:
+            bool: True if the form is valid, False otherwise
+        """
+        try:
+            validation_result = self.validate_form_ics205()
+            return validation_result.get("is_valid", False)
+        except Exception as e:
+            logger.error(f"Validation error: {e}")
+            return False
+    
     def export_to_dict(self) -> Dict[str, Any]:
         """Export ICS-205 form data to dictionary format.
         
