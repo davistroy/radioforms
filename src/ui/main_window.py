@@ -24,14 +24,24 @@ try:
     from .ics213_widget import ICS213Widget
     from ..services.form_service import FormService
     from ..services.file_service import FileService, FileServiceError
+    from ..services.multi_form_service import MultiFormService
     from ..database.connection import DatabaseManager
     from ..forms.ics213 import Priority
+    
+    # Import dashboard system
+    try:
+        from .dashboard.dashboard_widget import DashboardWidget
+        DASHBOARD_AVAILABLE = True
+    except ImportError:
+        DASHBOARD_AVAILABLE = False
     
 except ImportError:
     PYSIDE6_AVAILABLE = False
     ICS213Widget = None
     FormService = None
     DatabaseManager = None
+    MultiFormService = None
+    DASHBOARD_AVAILABLE = False
     # Dummy classes for development
     class QMainWindow:
         def __init__(self, parent=None): pass
@@ -97,8 +107,10 @@ class MainWindow(QMainWindow):
         self.ics205_widget = None
         self.ics202_widget = None
         self.ics201_widget = None
+        self.dashboard_widget = None
         self.form_service = None
         self.file_service = None
+        self.multi_form_service = None
         self.db_manager = None
         
         # Menu actions for state management
@@ -262,6 +274,42 @@ class MainWindow(QMainWindow):
             placeholder = QLabel("ICS-201 Incident Briefing (Template not available)")
             placeholder.setAlignment(Qt.AlignCenter)
             self.tab_widget.addTab(placeholder, "ICS-201 Incident Briefing")
+        
+        # Add Dashboard tab
+        try:
+            # Initialize services if not already done for dashboard
+            if not hasattr(self, 'multi_form_service') or not self.multi_form_service:
+                self._initialize_services()
+            
+            if DASHBOARD_AVAILABLE and hasattr(self, 'multi_form_service') and self.multi_form_service:
+                self.dashboard_widget = DashboardWidget(form_service=self.multi_form_service)
+                self.tab_widget.addTab(self.dashboard_widget, "📊 Dashboard")
+                
+                # Connect dashboard signals
+                if hasattr(self.dashboard_widget, 'form_selected'):
+                    self.dashboard_widget.form_selected.connect(self._on_dashboard_form_selected)
+                if hasattr(self.dashboard_widget, 'incident_changed'):
+                    self.dashboard_widget.incident_changed.connect(self._on_dashboard_incident_changed)
+                if hasattr(self.dashboard_widget, 'refresh_requested'):
+                    self.dashboard_widget.refresh_requested.connect(self._on_dashboard_refresh)
+                
+                # Set initial incident if available
+                self.dashboard_widget.set_incident("Active Incident")
+                
+                self.logger.info("Dashboard widget added successfully")
+            else:
+                self.logger.warning("Dashboard not available - missing dependencies")
+                # Add placeholder for Dashboard
+                placeholder = QLabel("Dashboard (Not available)")
+                placeholder.setAlignment(Qt.AlignCenter)
+                self.tab_widget.addTab(placeholder, "📊 Dashboard")
+                
+        except Exception as e:
+            self.logger.error(f"Failed to add dashboard widget: {e}")
+            # Add placeholder for Dashboard
+            placeholder = QLabel("Dashboard (Error)")
+            placeholder.setAlignment(Qt.AlignCenter)
+            self.tab_widget.addTab(placeholder, "📊 Dashboard")
         
         main_layout.addWidget(self.tab_widget)
         
@@ -475,22 +523,33 @@ class MainWindow(QMainWindow):
     
     def _initialize_services(self) -> None:
         """Initialize database and form services."""
+        if not PYSIDE6_AVAILABLE:
+            self.logger.info("PySide6 not available - services initialization skipped")
+            return
+            
         try:
             # Initialize database manager
-            self.db_manager = DatabaseManager(self.database_path)
+            if DatabaseManager:
+                self.db_manager = DatabaseManager(self.database_path)
             
-            # Initialize and validate database schema
-            from ..database.schema import SchemaManager
-            schema_manager = SchemaManager(self.db_manager)
-            schema_manager.initialize_database()
+                # Initialize and validate database schema
+                from ..database.schema import SchemaManager
+                schema_manager = SchemaManager(self.db_manager)
+                schema_manager.initialize_database()
             
-            # Initialize form service
-            self.form_service = FormService(self.db_manager)
+                # Initialize form service
+                if FormService:
+                    self.form_service = FormService(self.db_manager)
+            
+            # Initialize multi-form service for dashboard integration
+            if MultiFormService:
+                self.multi_form_service = MultiFormService(self.database_path)
             
             # Initialize file service
+            from ..services.file_service import FileService
             self.file_service = FileService()
             
-            self.logger.info("Database, form, and file services initialized successfully")
+            self.logger.info("Database, form, file, and multi-form services initialized successfully")
             
         except Exception as e:
             error_msg = f"Failed to initialize services: {e}"
@@ -1135,6 +1194,61 @@ class MainWindow(QMainWindow):
                     self.actions[action_name].setChecked(False)
         
         self.logger.debug(f"Menu states updated: has_form={has_form}, has_changes={has_unsaved_changes}")
+    
+    # Dashboard Signal Handlers
+    
+    def _on_dashboard_form_selected(self, form_identifier: str) -> None:
+        """Handle form selection from dashboard.
+        
+        Args:
+            form_identifier: Form type or ID selected from dashboard
+        """
+        self.logger.info(f"Dashboard form selected: {form_identifier}")
+        
+        # Map form types to tab indices
+        form_tab_map = {
+            'ICS-213': 0,
+            'ICS-205': 1,
+            'ICS-202': 2,
+            'ICS-201': 3
+        }
+        
+        # Switch to appropriate tab if form type is recognized
+        if form_identifier in form_tab_map:
+            tab_index = form_tab_map[form_identifier]
+            if PYSIDE6_AVAILABLE and hasattr(self, 'tab_widget'):
+                self.tab_widget.setCurrentIndex(tab_index)
+                self.logger.info(f"Switched to tab {tab_index} for {form_identifier}")
+    
+    def _on_dashboard_incident_changed(self, incident_name: str) -> None:
+        """Handle incident name change from dashboard.
+        
+        Args:
+            incident_name: New incident name
+        """
+        self.logger.info(f"Dashboard incident changed to: {incident_name}")
+        
+        # Update window title to include incident name
+        if incident_name:
+            self.setWindowTitle(f"RadioForms - {incident_name}")
+        else:
+            self.setWindowTitle("RadioForms - ICS Forms Management")
+        
+        # Refresh dashboard data
+        if hasattr(self, 'dashboard_widget') and self.dashboard_widget:
+            self.dashboard_widget.refresh_data()
+    
+    def _on_dashboard_refresh(self) -> None:
+        """Handle dashboard refresh request."""
+        self.logger.info("Dashboard refresh requested")
+        
+        # Refresh all services and dashboard data
+        if hasattr(self, 'dashboard_widget') and self.dashboard_widget:
+            self.dashboard_widget.refresh_data()
+            
+        # Update status
+        if hasattr(self, 'status_label'):
+            self.status_label.setText("Dashboard refreshed")
     
     def closeEvent(self, event) -> None:
         """Handle window close event.
