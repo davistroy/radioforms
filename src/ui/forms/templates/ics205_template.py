@@ -13,6 +13,7 @@ Notes:
 
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
+from datetime import datetime
 import logging
 
 # Import base classes
@@ -543,3 +544,98 @@ class ICS205Template(FormTemplate):
         
         logger.info(f"Created ICS-205 form from dictionary data")
         return form
+    
+    # Required properties for integration testing
+    
+    @property
+    def form_type(self) -> str:
+        """Get the form type identifier."""
+        return self.metadata.form_id
+    
+    @property
+    def form_title(self) -> str:
+        """Get the form title."""
+        return self.metadata.name
+    
+    def get_default_data(self) -> Dict[str, Any]:
+        """Get default data structure for the form."""
+        return {
+            'incident_name': '',
+            'operational_period': '',
+            'date_prepared': '',
+            'prepared_by': '',
+            'frequency_assignments': [],
+            'communication_procedures': '',
+            'special_instructions': '',
+            'repeater_info': '',
+            'backup_procedures': ''
+        }
+    
+    def set_data(self, data: Dict[str, Any]) -> None:
+        """Set form data using simplified interface."""
+        # Convert simple data format to full form data structure
+        form_data = {
+            'sections': {
+                'header': {
+                    'incident_name': data.get('incident_name', ''),
+                    'operational_period': data.get('operational_period', ''),
+                    'date_prepared': data.get('date_prepared', ''),
+                    'prepared_by': data.get('prepared_by', '')
+                },
+                'frequency_assignments': {
+                    'frequency_assignments': data.get('frequency_assignments', [])
+                },
+                'special_instructions': {
+                    'communication_procedures': data.get('communication_procedures', ''),
+                    'special_instructions': data.get('special_instructions', ''),
+                    'repeater_info': data.get('repeater_info', ''),
+                    'backup_procedures': data.get('backup_procedures', '')
+                }
+            }
+        }
+        self.set_form_data(form_data)
+    
+    def get_data(self) -> Dict[str, Any]:
+        """Get form data using simplified interface."""
+        form_data = self.get_form_data()
+        sections = form_data.get('sections', {})
+        
+        # Extract data in simplified format
+        header = sections.get('header', {})
+        freq_section = sections.get('frequency_assignments', {})
+        instructions = sections.get('special_instructions', {})
+        
+        return {
+            'incident_name': header.get('incident_name', ''),
+            'operational_period': header.get('operational_period', ''),
+            'date_prepared': header.get('date_prepared', ''),
+            'prepared_by': header.get('prepared_by', ''),
+            'frequency_assignments': freq_section.get('frequency_assignments', []),
+            'communication_procedures': instructions.get('communication_procedures', ''),
+            'special_instructions': instructions.get('special_instructions', ''),
+            'repeater_info': instructions.get('repeater_info', ''),
+            'backup_procedures': instructions.get('backup_procedures', '')
+        }
+    
+    def export_data(self) -> Dict[str, Any]:
+        """Export form data with metadata."""
+        return {
+            'metadata': {
+                'form_type': self.form_type,
+                'form_title': self.form_title,
+                'version': self.metadata.version,
+                'export_date': datetime.now().isoformat()
+            },
+            'form_data': self.get_data()
+        }
+    
+    def import_data(self, export_data: Dict[str, Any]) -> bool:
+        """Import form data from exported format."""
+        try:
+            if 'form_data' in export_data:
+                self.set_data(export_data['form_data'])
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Failed to import data: {e}")
+            return False
