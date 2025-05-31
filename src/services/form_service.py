@@ -219,6 +219,19 @@ class FormService:
             self.logger.error(error_msg)
             raise DatabaseError(error_msg) from e
     
+    def get_recent_forms(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get recent forms ordered by update time.
+        
+        This method provides the API expected by performance profiling and UI components.
+        
+        Args:
+            limit: Maximum number of forms to return (default: 50)
+            
+        Returns:
+            List of recent form summaries ordered by updated_at DESC
+        """
+        return self.list_forms(limit=limit, offset=0)
+    
     def delete_form(self, form_id: int) -> bool:
         """Delete form from database.
         

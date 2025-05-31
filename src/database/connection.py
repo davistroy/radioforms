@@ -54,6 +54,10 @@ class DatabaseManager:
         self.timeout = timeout
         self.logger = logging.getLogger(__name__)
         
+        # Connection reuse for performance optimization
+        self._connection = None
+        self._connection_valid = False
+        
         # Ensure database directory exists
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
         
@@ -172,6 +176,28 @@ class DatabaseManager:
             self.logger.error(error_msg)
             raise DatabaseConnectionError(error_msg) from e
     
+    def _get_reusable_connection(self) -> sqlite3.Connection:
+        """Get a reusable connection for performance optimization.
+        
+        Returns:
+            Configured SQLite connection that can be reused
+        """
+        # Check if we have a valid connection
+        if self._connection is not None and self._connection_valid:
+            try:
+                # Test connection with a simple query
+                self._connection.execute("SELECT 1")
+                return self._connection
+            except sqlite3.Error:
+                # Connection is invalid, need to recreate
+                self._connection_valid = False
+                self._connection = None
+        
+        # Create new connection
+        self._connection = self.create_connection()
+        self._connection_valid = True
+        return self._connection
+    
     @contextmanager
     def get_connection(self) -> ContextManager[sqlite3.Connection]:
         """Get a database connection as a context manager.
@@ -185,7 +211,8 @@ class DatabaseManager:
         """
         conn = None
         try:
-            conn = self.create_connection()
+            # Use reusable connection for performance
+            conn = self._get_reusable_connection()
             yield conn
         except Exception as e:
             if conn:
@@ -194,14 +221,10 @@ class DatabaseManager:
                     self.logger.debug("Transaction rolled back due to error")
                 except sqlite3.Error:
                     pass  # Rollback failed, connection may be closed
+                    # Mark connection as invalid so it gets recreated
+                    self._connection_valid = False
             raise
-        finally:
-            if conn:
-                try:
-                    conn.close()
-                    self.logger.debug("Database connection closed")
-                except sqlite3.Error as e:
-                    self.logger.warning(f"Error closing connection: {e}")
+        # Note: We don't close the reusable connection in finally
     
     @contextmanager
     def get_transaction(self) -> ContextManager[sqlite3.Connection]:
@@ -342,3 +365,19 @@ class DatabaseManager:
             error_msg = f"Failed to vacuum database: {e}"
             self.logger.error(error_msg)
             raise DatabaseError(error_msg) from e
+    
+    def close(self) -> None:
+        """Close the reusable database connection.
+        
+        This method should be called when the DatabaseManager is no longer needed
+        to properly clean up resources.
+        """
+        if self._connection is not None:
+            try:
+                self._connection.close()
+                self.logger.debug("Reusable database connection closed")
+            except sqlite3.Error as e:
+                self.logger.warning(f"Error closing reusable connection: {e}")
+            finally:
+                self._connection = None
+                self._connection_valid = False
