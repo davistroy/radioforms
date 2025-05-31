@@ -96,6 +96,7 @@ class MainWindow(QMainWindow):
         self.ics213_widget = None
         self.ics205_widget = None
         self.ics202_widget = None
+        self.ics201_widget = None
         self.form_service = None
         self.file_service = None
         self.db_manager = None
@@ -235,6 +236,32 @@ class MainWindow(QMainWindow):
             placeholder = QLabel("ICS-202 Incident Objectives (Template not available)")
             placeholder.setAlignment(Qt.AlignCenter)
             self.tab_widget.addTab(placeholder, "ICS-202 Incident Objectives")
+        
+        # Add ICS-201 template tab
+        try:
+            from .template_form_widget import create_ics201_widget
+            
+            # Initialize services if not already done
+            if not hasattr(self, 'form_service') or not self.form_service:
+                self._initialize_services()
+            
+            self.ics201_widget = create_ics201_widget(form_service=self.form_service)
+            self.tab_widget.addTab(self.ics201_widget, "ICS-201 Incident Briefing")
+            
+            # Connect template form signals
+            self.ics201_widget.form_changed.connect(self._on_form_changed)
+            self.ics201_widget.form_saved.connect(self._on_form_saved_signal)
+            self.ics201_widget.form_loaded.connect(self._on_form_loaded_signal)
+            self.ics201_widget.form_changed.connect(self._update_menu_states)
+            
+            self.logger.info("ICS-201 template widget added successfully")
+            
+        except ImportError as e:
+            self.logger.warning(f"ICS-201 template not available: {e}")
+            # Add placeholder for ICS-201
+            placeholder = QLabel("ICS-201 Incident Briefing (Template not available)")
+            placeholder.setAlignment(Qt.AlignCenter)
+            self.tab_widget.addTab(placeholder, "ICS-201 Incident Briefing")
         
         main_layout.addWidget(self.tab_widget)
         
@@ -1066,6 +1093,11 @@ class MainWindow(QMainWindow):
             has_form = self.ics202_widget.get_form_data() is not None
             has_unsaved_changes = self.ics202_widget.has_unsaved_changes() if has_form else False
             # Note: ICS-202 doesn't have priority field
+        elif current_widget == getattr(self, 'ics201_widget', None) and self.ics201_widget:
+            # ICS-201 template form
+            has_form = self.ics201_widget.get_form_data() is not None
+            has_unsaved_changes = self.ics201_widget.has_unsaved_changes() if has_form else False
+            # Note: ICS-201 doesn't have priority field
         
         # Update save action
         self.actions['save'].setEnabled(has_unsaved_changes)

@@ -425,6 +425,29 @@ class FormWidgetRegistry:
             logger = logging.getLogger(__name__)
             logger.debug(f"ICS-202 template not available: {e}")
             pass  # ICS-202 template not available
+        
+        try:
+            # Register ICS-201 template widget
+            try:
+                from ..template_form_widget import create_ics201_widget
+            except ImportError:
+                # Try alternative import path for testing
+                from ...ui.template_form_widget import create_ics201_widget
+            
+            self.register(
+                FormType.ICS_201,
+                create_ics201_widget,
+                "Incident Briefing",
+                "Incident briefing and initial response documentation for Command and General Staff.",
+                "",
+                create_ics201_widget  # Use factory function as creation function
+            )
+        except ImportError as e:
+            # Log the import error for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"ICS-201 template not available: {e}")
+            pass  # ICS-201 template not available
 
 
 # Global registry instance (lazy initialization)
