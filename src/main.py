@@ -119,6 +119,12 @@ Examples:
         help="Database file path (default: radioforms.db)"
     )
     
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="Run in headless mode (no GUI, for testing and automation)"
+    )
+    
     return parser.parse_args()
 
 
@@ -188,7 +194,23 @@ def main() -> NoReturn:
     logger.info(f"Command line arguments: {args}")
     
     try:
-        # Check requirements
+        # Check if running in headless mode
+        if args.headless:
+            logger.info("Running in headless mode")
+            from .app.headless_app import HeadlessApplication
+            
+            app = HeadlessApplication(
+                database_path=args.database,
+                debug=args.debug
+            )
+            
+            logger.info("Starting headless application")
+            exit_code = app.run()
+            
+            logger.info(f"Headless application finished with exit code: {exit_code}")
+            sys.exit(exit_code)
+        
+        # Check requirements for GUI mode
         if not check_requirements():
             logger.error("Requirements check failed")
             sys.exit(1)
