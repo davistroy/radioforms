@@ -642,21 +642,19 @@ class ICS214Data:
         return json.dumps(data, indent=2)
     
     @classmethod
-    def from_json(cls, json_data: str) -> ICS214Data:
-        """Create ICS214Data from JSON representation.
+    def from_dict(cls, data: Dict[str, Any]) -> ICS214Data:
+        """Create ICS214Data from dictionary representation.
         
         Args:
-            json_data: JSON string containing form data.
+            data: Dictionary containing form data.
             
         Returns:
-            ICS214Data: New form instance from JSON data.
+            ICS214Data: New form instance from dictionary data.
             
         Raises:
-            ValueError: If JSON data is invalid or malformed.
+            ValueError: If data is invalid or malformed.
         """
         try:
-            data = json.loads(json_data)
-            
             # Parse operational period
             op_period = OperationalPeriod.from_dict(data.get('operational_period', {}))
             
@@ -699,7 +697,27 @@ class ICS214Data:
                 modified_date=modified_date
             )
             
-        except (json.JSONDecodeError, KeyError, ValueError) as e:
+        except (KeyError, ValueError) as e:
+            raise ValueError(f"Invalid data for ICS-214 form: {e}")
+    
+    @classmethod
+    def from_json(cls, json_data: str) -> ICS214Data:
+        """Create ICS214Data from JSON representation.
+        
+        Args:
+            json_data: JSON string containing form data.
+            
+        Returns:
+            ICS214Data: New form instance from JSON data.
+            
+        Raises:
+            ValueError: If JSON data is invalid or malformed.
+        """
+        try:
+            data = json.loads(json_data)
+            return cls.from_dict(data)
+            
+        except (json.JSONDecodeError, ValueError) as e:
             raise ValueError(f"Invalid JSON data for ICS-214 form: {e}")
     
     def to_dict(self) -> Dict[str, Any]:
