@@ -59,7 +59,7 @@ function App() {
         preparer_name: 'Current User' // TODO: Get from settings
       });
 
-      console.log('Created form:', form);
+      // Form created successfully, will refresh dashboard
       
       // Refresh dashboard data
       await loadDashboardData();
@@ -135,17 +135,8 @@ function App() {
             
             <div className="flex items-center space-x-4">
               <span className="text-sm text-muted-foreground">
-                Backend: {backendInfo.type === 'mock' ? 'Development Mode' : 'Production'}
+                Backend: {backendInfo.description}
               </span>
-              {backendInfo.type === 'mock' && (
-                <button
-                  onClick={() => formService.initializeSampleData()}
-                  className="btn btn-outline btn-sm"
-                  title="Reinitialize sample data"
-                >
-                  Reset Data
-                </button>
-              )}
             </div>
           </div>
         </div>
@@ -291,7 +282,7 @@ function App() {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Backend:</span>
-                    <span>{backendInfo.type === 'mock' ? 'Mock (Dev)' : 'Tauri'}</span>
+                    <span>Tauri</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Version:</span>
@@ -302,15 +293,6 @@ function App() {
                     <span>{availableFormTypes.length}</span>
                   </div>
                 </div>
-                
-                {backendInfo.type === 'mock' && (
-                  <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                    <p className="text-xs text-yellow-800">
-                      <strong>Development Mode:</strong> Using mock backend with localStorage.
-                      Data will be lost when clearing browser data.
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
           </div>

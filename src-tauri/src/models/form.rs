@@ -163,7 +163,7 @@ impl FormModel {
     /// - Automatically updates updated_at timestamp
     pub async fn update_form(&self, id: i64, request: UpdateFormRequest) -> Result<Form> {
         // Get current form to validate updates
-        let mut current_form = self.get_form_by_id(id).await?
+        let current_form = self.get_form_by_id(id).await?
             .ok_or_else(|| anyhow::anyhow!("Form not found with ID: {}", id))?;
 
         // Validate status transition if requested
@@ -171,79 +171,16 @@ impl FormModel {
             if !current_form.can_transition_to(new_status)? {
                 return Err(anyhow::anyhow!(
                     "Invalid status transition from {:?} to {:?}", 
-                    current_form.status, new_status
+                    current_form.status()?, new_status
                 ));
             }
         }
 
-        // Build update query dynamically based on provided fields
-        let mut update_parts = Vec::new();
-        let mut bind_values: Vec<Box<dyn sqlx::Encode<'_, sqlx::Sqlite> + Send + Sync>> = Vec::new();
-        let mut param_count = 1;
-
+        // Update fields individually (simpler and more reliable approach)
         if let Some(incident_name) = &request.incident_name {
             if incident_name.trim().is_empty() {
                 return Err(anyhow::anyhow!("Incident name cannot be empty"));
             }
-            update_parts.push(format!("incident_name = ?{}", param_count));
-            bind_values.push(Box::new(incident_name.clone()));
-            param_count += 1;
-        }
-
-        if let Some(incident_number) = &request.incident_number {
-            update_parts.push(format!("incident_number = ?{}", param_count));
-            bind_values.push(Box::new(incident_number.clone()));
-            param_count += 1;
-        }
-
-        if let Some(status) = &request.status {
-            update_parts.push(format!("status = ?{}", param_count));
-            bind_values.push(Box::new(status.to_string()));
-            param_count += 1;
-        }
-
-        if let Some(data) = &request.data {
-            let data_json = serde_json::to_string(data)
-                .context("Failed to serialize form data")?;
-            update_parts.push(format!("data = ?{}", param_count));
-            bind_values.push(Box::new(data_json));
-            param_count += 1;
-        }
-
-        if let Some(notes) = &request.notes {
-            update_parts.push(format!("notes = ?{}", param_count));
-            bind_values.push(Box::new(notes.clone()));
-            param_count += 1;
-        }
-
-        if let Some(preparer_name) = &request.preparer_name {
-            update_parts.push(format!("preparer_name = ?{}", param_count));
-            bind_values.push(Box::new(preparer_name.clone()));
-            param_count += 1;
-        }
-
-        if update_parts.is_empty() {
-            return Ok(current_form); // Nothing to update
-        }
-
-        // Always update the updated_at timestamp
-        update_parts.push(format!("updated_at = ?{}", param_count));
-        bind_values.push(Box::new(Utc::now()));
-
-        let query = format!(
-            "UPDATE forms SET {} WHERE id = ?{}",
-            update_parts.join(", "),
-            param_count + 1
-        );
-
-        let mut query_builder = sqlx::query(&query);
-        for value in bind_values {
-            // Note: This is a simplified approach. In a real implementation,
-            // you'd want to use a proper query builder to handle the dynamic binding.
-        }
-        
-        // For now, let's use a simpler approach with individual field updates
-        if let Some(incident_name) = &request.incident_name {
             sqlx::query("UPDATE forms SET incident_name = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2")
                 .bind(incident_name)
                 .bind(id)
@@ -293,7 +230,7 @@ impl FormModel {
         };
 
         // Check if deletion is allowed
-        if form.status == FormStatus::Final && !force {
+        if form.status()? == FormStatus::Final && !force {
             return Err(anyhow::anyhow!(
                 "Cannot delete final form without force flag. Form ID: {}", id
             ));
@@ -471,7 +408,7 @@ impl FormModel {
                        serde_json::Value::String(Utc::now().format("%H:%M").to_string()));
 
         let create_request = CreateFormRequest {
-            form_type: source_form.form_type,
+            form_type: source_form.form_type()?,
             incident_name: new_incident_name.unwrap_or(source_form.incident_name),
             incident_number: source_form.incident_number,
             preparer_name: source_form.preparer_name,

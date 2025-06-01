@@ -76,7 +76,7 @@ pub async fn create_form(
     }
 
     let form_type: ICSFormType = form_type.parse()
-        .map_err(|e| ErrorResponse {
+        .map_err(|e: anyhow::Error| ErrorResponse {
             error: format!("Invalid form type: {}", form_type),
             details: Some(e.to_string()),
         })?;
@@ -94,7 +94,7 @@ pub async fn create_form(
 
     let form = form_model.create_form(request).await?;
     
-    log::info!("Form created successfully: id={}, type={}", form.id, form.form_type);
+    log::info!("Form created successfully: id={}, type={:?}", form.id, form.form_type());
     Ok(form)
 }
 
@@ -179,7 +179,7 @@ pub async fn update_form(
 
     let form = form_model.update_form(id, updates).await?;
     
-    log::info!("Form updated successfully: id={}, status={:?}", form.id, form.status);
+    log::info!("Form updated successfully: id={}, status={:?}", form.id, form.status());
     Ok(form)
 }
 
@@ -425,4 +425,62 @@ pub struct FormTypeInfo {
     pub name: String,
     pub description: String,
     pub category: String,
+}
+
+/// Database statistics for monitoring
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DatabaseStats {
+    pub total_forms: i64,
+    pub draft_forms: i64,
+    pub completed_forms: i64,
+    pub final_forms: i64,
+    pub database_size_bytes: i64,
+    pub last_backup: Option<String>,
+}
+
+/// Gets database statistics for monitoring and dashboard display.
+#[tauri::command]
+pub async fn get_database_stats(
+    state: State<'_, AppState>
+) -> Result<DatabaseStats, ErrorResponse> {
+    log::debug!("Fetching database statistics");
+
+    let db = state.lock().await;
+    let form_model = FormModel::new(db.pool().clone());
+
+    // Get form counts by status
+    let all_forms = form_model.search_forms(FormFilters::default()).await
+        .map_err(|e| ErrorResponse {
+            error: "Failed to fetch forms for statistics".to_string(),
+            details: Some(e.to_string()),
+        })?;
+
+    let mut draft_count = 0i64;
+    let mut completed_count = 0i64;
+    let mut final_count = 0i64;
+
+    for form in &all_forms.forms {
+        match form.status() {
+            Ok(FormStatus::Draft) => draft_count += 1,
+            Ok(FormStatus::Completed) => completed_count += 1,
+            Ok(FormStatus::Final) => final_count += 1,
+            Err(_) => {}, // Skip forms with invalid status
+        }
+    }
+
+    // For database size, we'll use a simple approximation
+    // In a production system, you might query the actual database file size
+    let database_size_bytes = all_forms.forms.len() as i64 * 1024; // Rough estimate
+
+    let stats = DatabaseStats {
+        total_forms: all_forms.total_count,
+        draft_forms: draft_count,
+        completed_forms: completed_count,
+        final_forms: final_count,
+        database_size_bytes,
+        last_backup: None, // Could be implemented with actual backup tracking
+    };
+
+    log::debug!("Database stats: {} total forms", stats.total_forms);
+    Ok(stats)
 }

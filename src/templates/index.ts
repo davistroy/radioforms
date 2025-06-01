@@ -17,29 +17,13 @@ import { ics201Template } from './ics-201';
 /**
  * Registry of all available form templates
  */
-export const formTemplates: Record<ICSFormType, FormTemplate> = {
+export const formTemplates: Partial<Record<ICSFormType, FormTemplate>> = {
   'ICS-201': ics201Template,
   
   // TODO: Implement remaining form templates in subsequent phases
-  'ICS-202': null as any, // Placeholder
-  'ICS-203': null as any, // Placeholder
-  'ICS-204': null as any, // Placeholder
-  'ICS-205': null as any, // Placeholder
-  'ICS-205A': null as any, // Placeholder
-  'ICS-206': null as any, // Placeholder
-  'ICS-207': null as any, // Placeholder
-  'ICS-208': null as any, // Placeholder
-  'ICS-209': null as any, // Placeholder
-  'ICS-210': null as any, // Placeholder
-  'ICS-211': null as any, // Placeholder
-  'ICS-213': null as any, // Placeholder
-  'ICS-214': null as any, // Placeholder
-  'ICS-215': null as any, // Placeholder
-  'ICS-215A': null as any, // Placeholder
-  'ICS-218': null as any, // Placeholder
-  'ICS-220': null as any, // Placeholder
-  'ICS-221': null as any, // Placeholder
-  'ICS-225': null as any, // Placeholder
+  // 'ICS-202': ics202Template,
+  // 'ICS-203': ics203Template,
+  // ... etc
 };
 
 /**
@@ -146,8 +130,8 @@ export function validateTemplate(template: FormTemplate): { valid: boolean; erro
  * @param template - The form template
  * @returns Object with default values for all fields
  */
-export function createDefaultFormData(template: FormTemplate): Record<string, any> {
-  const defaultData: Record<string, any> = {};
+export function createDefaultFormData(template: FormTemplate): Record<string, unknown> {
+  const defaultData: Record<string, unknown> = {};
 
   template.sections.forEach(section => {
     section.fields.forEach(field => {

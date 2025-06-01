@@ -59,6 +59,14 @@ impl std::str::FromStr for FormStatus {
     }
 }
 
+impl TryFrom<String> for FormStatus {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        value.parse()
+    }
+}
+
 /// ICS Form type enumeration.
 /// Represents the different types of ICS forms supported by the application.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -125,6 +133,14 @@ impl std::str::FromStr for ICSFormType {
     }
 }
 
+impl TryFrom<String> for ICSFormType {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        value.parse()
+    }
+}
+
 /// Main form record structure.
 /// 
 /// Business Logic:
@@ -143,9 +159,8 @@ pub struct Form {
     /// Unique identifier for the form (auto-increment primary key)
     pub id: i64,
     
-    /// Type of ICS form (ICS-201, ICS-202, etc.)
-    #[sqlx(try_from = "String")]
-    pub form_type: ICSFormType,
+    /// Type of ICS form (ICS-201, ICS-202, etc.) - stored as string
+    form_type: String,
     
     /// Name of the incident this form relates to
     pub incident_name: String,
@@ -153,9 +168,8 @@ pub struct Form {
     /// Optional incident number for cross-referencing
     pub incident_number: Option<String>,
     
-    /// Current status of the form (draft, completed, final)
-    #[sqlx(try_from = "String")]
-    pub status: FormStatus,
+    /// Current status of the form (draft, completed, final) - stored as string
+    status: String,
     
     /// Complete form data as JSON
     /// Contains all field values specific to the form type
@@ -175,6 +189,26 @@ pub struct Form {
 }
 
 impl Form {
+    /// Gets the form type as an enum
+    pub fn form_type(&self) -> anyhow::Result<ICSFormType> {
+        self.form_type.parse()
+    }
+    
+    /// Sets the form type from an enum
+    pub fn set_form_type(&mut self, form_type: ICSFormType) {
+        self.form_type = form_type.to_string();
+    }
+    
+    /// Gets the status as an enum
+    pub fn status(&self) -> anyhow::Result<FormStatus> {
+        self.status.parse()
+    }
+    
+    /// Sets the status from an enum
+    pub fn set_status(&mut self, status: FormStatus) {
+        self.status = status.to_string();
+    }
+
     /// Parses the JSON data field into a structured HashMap.
     /// 
     /// Business Logic:
@@ -254,7 +288,8 @@ impl Form {
     /// - Draft -> Completed -> Final (no backwards transitions)
     /// - Validates required fields before status changes
     pub fn can_transition_to(&self, new_status: &FormStatus) -> anyhow::Result<bool> {
-        match (&self.status, new_status) {
+        let current_status = self.status()?;
+        match (&current_status, new_status) {
             // Can always stay in same status
             (current, new) if current == new => Ok(true),
             

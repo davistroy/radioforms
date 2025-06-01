@@ -53,7 +53,7 @@ export interface Form {
   status: FormStatus;
   
   /** Complete form data as structured object */
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   
   /** Optional notes or comments about the form */
   notes?: string;
@@ -77,7 +77,7 @@ export interface CreateFormRequest {
   incident_name: string;
   incident_number?: string;
   preparer_name?: string;
-  initial_data?: Record<string, any>;
+  initial_data?: Record<string, unknown>;
 }
 
 /**
@@ -88,7 +88,7 @@ export interface UpdateFormRequest {
   incident_name?: string;
   incident_number?: string;
   status?: FormStatus;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
   notes?: string;
   preparer_name?: string;
 }
@@ -177,7 +177,7 @@ export interface FormTemplate {
   description: string;
   category: string;
   sections: FormSection[];
-  validation_rules?: Record<string, any>;
+  validation_rules?: Record<string, unknown>;
 }
 
 /**

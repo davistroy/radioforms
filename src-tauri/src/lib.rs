@@ -95,6 +95,7 @@ pub fn run() {
             get_recent_forms,
             duplicate_form,
             get_form_types,
+            get_database_stats,
             
             // Keep the original greet command for testing
             greet
