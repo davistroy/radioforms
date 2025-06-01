@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "STANDALONE ICS Forms Management Application",
+  "description": "RadioForms - STANDALONE ICS Forms Management Application",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

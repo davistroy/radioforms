@@ -1,7 +1,7 @@
 [package]
 name = "radioforms"
 version = "1.0.0"
-description = "STANDALONE ICS Forms Management Application"
+description = "RadioForms - STANDALONE ICS Forms Management Application"
 authors = ["RadioForms Team"]
 edition = "2021"
 
