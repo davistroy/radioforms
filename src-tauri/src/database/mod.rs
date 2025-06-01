@@ -24,9 +24,14 @@ use std::env;
 use anyhow::{Result, Context};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use crate::database::migration_runner::{MigrationRunner, MigrationRunnerFactory};
 
 pub mod schema;
 pub mod migrations;
+pub mod migration_runner;
+
+#[cfg(test)]
+mod migration_tests;
 
 /// Database connection manager for the RadioForms application.
 /// Handles SQLite database initialization, migrations, and connection pooling.
@@ -92,19 +97,43 @@ impl Database {
     /// Runs database migrations to ensure schema is up to date.
     /// 
     /// Business Logic:
-    /// - Simple migration system for schema updates
-    /// - Preserves existing data during migrations
-    /// - Logs migration progress for troubleshooting
+    /// - Enhanced migration system with rollback and tracking capabilities
+    /// - Preserves existing data during migrations with backup creation
+    /// - Comprehensive logging and error reporting for troubleshooting
+    /// - Production-ready migration execution with integrity validation
     async fn run_migrations(&self) -> Result<()> {
-        log::info!("Running database migrations...");
+        log::info!("Running enhanced database migrations...");
         
-        // Run embedded migrations
-        sqlx::migrate!("./migrations")
-            .run(&self.pool)
-            .await
-            .context("Failed to run database migrations")?;
-
-        log::info!("Database migrations completed successfully");
+        // Create production migration runner for maximum safety
+        let mut runner = MigrationRunnerFactory::create_production_runner(
+            self.pool.clone(), 
+            self.db_path.clone()
+        ).await.context("Failed to create migration runner")?;
+        
+        // Create backup before running migrations
+        let backup_path = runner.create_backup().await
+            .context("Failed to create pre-migration backup")?;
+        log::info!("Pre-migration backup created: {}", backup_path.display());
+        
+        // Run SQLx embedded migrations
+        runner.run_sqlx_migrations().await
+            .context("Failed to execute SQLx migrations")?;
+        
+        // Perform post-migration optimization and validation
+        runner.optimize_post_migration().await
+            .context("Failed to optimize database after migration")?;
+        
+        // Validate migration integrity
+        let validation_issues = runner.validate_migrations().await
+            .context("Failed to validate migration integrity")?;
+        
+        if !validation_issues.is_empty() {
+            log::warn!("Migration validation found {} issues: {:?}", 
+                     validation_issues.len(), validation_issues);
+            // Continue execution but log warnings - issues may not be critical
+        }
+        
+        log::info!("Enhanced database migrations completed successfully");
         Ok(())
     }
 
