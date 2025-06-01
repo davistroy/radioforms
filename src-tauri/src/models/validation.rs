@@ -31,7 +31,7 @@ use anyhow::{Result, anyhow};
 
 use super::form_data::*;
 use super::ics_types::*;
-use crate::database::schema::{ValidationRule, ICSFormType};
+use crate::database::schema::{ValidationRule, ICSFormType, FormStatus};
 
 /// Main validation engine for ICS forms.
 /// 
@@ -826,7 +826,7 @@ impl ValidationEngine {
         let mut info_messages = Vec::new();
         
         // Check that end time is after start time
-        if op_period.end_time <= op_period.start_time {
+        if op_period.to <= op_period.from {
             errors.push(ValidationError {
                 field: "operational_period".to_string(),
                 message: "Operational period end time must be after start time".to_string(),
@@ -835,7 +835,7 @@ impl ValidationEngine {
             });
         } else {
             // Check operational period duration
-            let duration = op_period.end_time.signed_duration_since(op_period.start_time);
+            let duration = op_period.to.signed_duration_since(op_period.from);
             let hours = duration.num_hours();
             
             if hours > 24 {
@@ -872,8 +872,8 @@ impl ValidationEngine {
             warnings,
             info_messages,
             current_value: Some(serde_json::json!({
-                "start": op_period.start_time,
-                "end": op_period.end_time
+                "start": op_period.from,
+                "end": op_period.to
             })),
             suggestions: Vec::new(),
         })

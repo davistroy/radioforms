@@ -170,7 +170,7 @@ pub fn extract_json_fields(data: &JsonValue, field_paths: &[&str]) -> Result<Jso
 }
 
 /// Extracts a nested field from JSON using dot notation.
-fn extract_nested_field(data: &JsonValue, path: &str) -> Option<&JsonValue> {
+fn extract_nested_field<'a>(data: &'a JsonValue, path: &str) -> Option<&'a JsonValue> {
     let parts: Vec<&str> = path.split('.').collect();
     let mut current = data;
     

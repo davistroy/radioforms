@@ -52,16 +52,15 @@ impl SerdeTestSuite {
         let header = ICSFormHeader {
             incident_name: "Wildfire - Pine Canyon".to_string(),
             operational_period: Some(DateTimeRange {
-                start_time: DateTime::from_timestamp(1735689600, 0).unwrap(), // 2025-01-01 00:00:00 UTC
-                end_time: DateTime::from_timestamp(1735776000, 0).unwrap(),   // 2025-01-02 00:00:00 UTC
+                from: DateTime::from_timestamp(1735689600, 0).unwrap(), // 2025-01-01 00:00:00 UTC
+                to: DateTime::from_timestamp(1735776000, 0).unwrap(),   // 2025-01-02 00:00:00 UTC
             }),
             incident_number: Some("CA-2025-001234".to_string()),
             form_version: Some("2.0".to_string()),
             prepared_date_time: DateTime::from_timestamp(1735689600, 0).unwrap(),
             page_info: Some(PageInfo {
-                page_number: 1,
-                total_pages: 3,
-                form_title: "Incident Briefing".to_string(),
+                page_number: Some("1 of 3".to_string()),
+                iap_page_number: Some("IAP-1".to_string()),
             }),
         };
 
@@ -81,8 +80,8 @@ impl SerdeTestSuite {
         assert_eq!(header.form_version, deserialized.form_version);
         
         if let (Some(orig_period), Some(deser_period)) = (&header.operational_period, &deserialized.operational_period) {
-            assert_eq!(orig_period.start_time, deser_period.start_time);
-            assert_eq!(orig_period.end_time, deser_period.end_time);
+            assert_eq!(orig_period.from, deser_period.from);
+            assert_eq!(orig_period.to, deser_period.to);
         }
 
         println!("✅ ICS Form Header serialization test passed");
@@ -98,37 +97,26 @@ impl SerdeTestSuite {
     /// - Verifies digital signature data integrity
     pub fn test_footer_serialization() -> Result<()> {
         let footer = ICSFormFooter {
-            prepared_by: Some(PersonPosition {
+            prepared_by: PreparedBy {
                 name: "John Smith".to_string(),
-                position: Some("Communications Unit Leader".to_string()),
+                position_title: "Communications Unit Leader".to_string(),
                 signature: Some(DigitalSignature {
-                    signature_type: SignatureType::Electronic,
                     signature_data: vec![1, 2, 3, 4, 5], // Sample signature data
+                    signature_type: SignatureType::Electronic,
                     timestamp: DateTime::from_timestamp(1735689600, 0).unwrap(),
-                    certificate_info: None,
                 }),
-                contact_info: Some(ContactInfo {
-                    phone: Some("555-0123".to_string()),
-                    email: Some("j.smith@agency.gov".to_string()),
-                    radio_callsign: Some("COMM-1".to_string()),
-                }),
-            }),
-            approved_by: Some(PersonPosition {
+                date_time: None,
+            },
+            approved_by: Some(ApprovedBy {
                 name: "Sarah Johnson".to_string(),
-                position: Some("Incident Commander".to_string()),
+                position_title: Some("Incident Commander".to_string()),
                 signature: Some(DigitalSignature {
-                    signature_type: SignatureType::Digital,
                     signature_data: vec![10, 20, 30, 40, 50],
+                    signature_type: SignatureType::Digital,
                     timestamp: DateTime::from_timestamp(1735693200, 0).unwrap(),
-                    certificate_info: Some("Certificate SHA256: abc123...".to_string()),
                 }),
-                contact_info: Some(ContactInfo {
-                    phone: Some("555-0456".to_string()),
-                    email: Some("s.johnson@agency.gov".to_string()),
-                    radio_callsign: Some("IC-1".to_string()),
-                }),
+                date_time: None,
             }),
-            additional_signatures: vec![],
         };
 
         let json = serde_json::to_string_pretty(&footer)
@@ -185,39 +173,39 @@ impl SerdeTestSuite {
             current_organization: OrganizationStructure {
                 incident_commander: PersonPosition {
                     name: "Chief Martinez".to_string(),
-                    position: Some("Incident Commander".to_string()),
-                    signature: None,
+                    position: "Incident Commander".to_string(),
+                    agency: Some("Fire Department".to_string()),
                     contact_info: None,
                 },
                 public_information_officer: Some(PersonPosition {
                     name: "Officer Davis".to_string(),
-                    position: Some("Public Information Officer".to_string()),
-                    signature: None,
+                    position: "Public Information Officer".to_string(),
+                    agency: Some("Police Department".to_string()),
                     contact_info: None,
                 }),
                 safety_officer: Some(PersonPosition {
                     name: "Captain Wilson".to_string(),
-                    position: Some("Safety Officer".to_string()),
-                    signature: None,
+                    position: "Safety Officer".to_string(),
+                    agency: Some("Fire Department".to_string()),
                     contact_info: None,
                 }),
                 liaison_officer: None,
                 operations_chief: Some(PersonPosition {
                     name: "Division Chief Adams".to_string(),
-                    position: Some("Operations Section Chief".to_string()),
-                    signature: None,
+                    position: "Operations Section Chief".to_string(),
+                    agency: Some("Fire Department".to_string()),
                     contact_info: None,
                 }),
                 planning_chief: Some(PersonPosition {
                     name: "Battalion Chief Lee".to_string(),
-                    position: Some("Planning Section Chief".to_string()),
-                    signature: None,
+                    position: "Planning Section Chief".to_string(),
+                    agency: Some("Fire Department".to_string()),
                     contact_info: None,
                 }),
                 logistics_chief: Some(PersonPosition {
                     name: "Captain Rodriguez".to_string(),
-                    position: Some("Logistics Section Chief".to_string()),
-                    signature: None,
+                    position: "Logistics Section Chief".to_string(),
+                    agency: Some("Fire Department".to_string()),
                     contact_info: None,
                 }),
                 finance_admin_chief: None,
@@ -431,27 +419,25 @@ impl SerdeTestSuite {
             header: ICSFormHeader {
                 incident_name: "Wildfire - Pine Canyon".to_string(),
                 operational_period: Some(DateTimeRange {
-                    start_time: DateTime::from_timestamp(1735689600, 0).unwrap(),
-                    end_time: DateTime::from_timestamp(1735776000, 0).unwrap(),
+                    from: DateTime::from_timestamp(1735689600, 0).unwrap(),
+                    to: DateTime::from_timestamp(1735776000, 0).unwrap(),
                 }),
                 incident_number: Some("CA-2025-001234".to_string()),
                 form_version: Some("2.0".to_string()),
                 prepared_date_time: DateTime::from_timestamp(1735689600, 0).unwrap(),
                 page_info: Some(PageInfo {
-                    page_number: 1,
-                    total_pages: 1,
-                    form_title: "Incident Briefing".to_string(),
+                    page_number: Some("1 of 1".to_string()),
+                    iap_page_number: Some("IAP-1".to_string()),
                 }),
             },
             footer: ICSFormFooter {
-                prepared_by: Some(PersonPosition {
+                prepared_by: PreparedBy {
                     name: "John Smith".to_string(),
-                    position: Some("Communications Unit Leader".to_string()),
+                    position_title: "Communications Unit Leader".to_string(),
                     signature: None,
-                    contact_info: None,
-                }),
+                    date_time: None,
+                },
                 approved_by: None,
-                additional_signatures: Vec::new(),
             },
             form_data: FormSpecificData::ICS201(ICS201Data {
                 map_sketch: None,
@@ -461,8 +447,8 @@ impl SerdeTestSuite {
                 current_organization: OrganizationStructure {
                     incident_commander: PersonPosition {
                         name: "Chief Martinez".to_string(),
-                        position: Some("Incident Commander".to_string()),
-                        signature: None,
+                        position: "Incident Commander".to_string(),
+                        agency: Some("Fire Department".to_string()),
                         contact_info: None,
                     },
                     public_information_officer: None,
@@ -478,13 +464,11 @@ impl SerdeTestSuite {
                 safety_message: None,
             }),
             lifecycle: FormLifecycle {
-                status: FormStatus::Draft,
-                workflow_position: "initial".to_string(),
-                priority: IncidentPriority::Routine,
+                status: EnhancedFormStatus::Draft,
                 created_at: DateTime::from_timestamp(1735689600, 0).unwrap(),
                 updated_at: DateTime::from_timestamp(1735689600, 0).unwrap(),
-                version: 1,
-                relationships: Vec::new(),
+                status_history: Vec::new(),
+                workflow_position: WorkflowPosition::Initial,
             },
             validation_results: None,
         };

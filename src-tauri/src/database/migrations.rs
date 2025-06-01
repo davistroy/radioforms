@@ -365,20 +365,20 @@ impl MigrationManager {
         
         let mut history = Vec::new();
         for row in rows {
-            let applied_at_str: String = row.try_get("applied_at")?;
+            let applied_at_str: String = row.get("applied_at");
             let applied_at = DateTime::parse_from_rfc3339(&applied_at_str)
                 .context("Failed to parse applied_at timestamp")?
                 .with_timezone(&Utc);
             
             history.push(MigrationInfo {
-                version: row.try_get("version")?,
-                description: row.try_get("description")?,
+                version: row.get("version"),
+                description: row.get("description"),
                 applied_at,
-                execution_time_ms: row.try_get("execution_time_ms")?,
-                success: row.try_get("success")?,
-                error_message: row.try_get("error_message")?,
-                checksum: row.try_get("checksum")?,
-                has_rollback: row.try_get("has_rollback")?,
+                execution_time_ms: row.get("execution_time_ms"),
+                success: row.get("success"),
+                error_message: row.get("error_message"),
+                checksum: row.get("checksum"),
+                has_rollback: row.get("has_rollback"),
             });
         }
         

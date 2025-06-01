@@ -30,6 +30,7 @@ use crate::database::transactions::{TransactionManager, TransactionResult, Trans
 use crate::database::crud_operations::CrudOperations;
 use crate::database::errors::{DatabaseError, DatabaseResult, ErrorContext};
 use crate::database::integrity_checker::{IntegrityChecker, IntegrityCheckerFactory, IntegrityCheckResult};
+use crate::database::compaction::{DatabaseCompactor, DatabaseCompactorFactory, CompactionResult, CompactionConfig};
 
 pub mod schema;
 pub mod migrations;
@@ -38,6 +39,7 @@ pub mod transactions;
 pub mod crud_operations;
 pub mod errors;
 pub mod integrity_checker;
+pub mod compaction;
 
 #[cfg(test)]
 mod migration_tests;
@@ -264,8 +266,7 @@ impl Database {
             .await
             .context("Failed to run integrity check")?;
 
-        let result: String = integrity_result.try_get(0)
-            .context("Failed to get integrity check result")?;
+        let result: String = integrity_result.get(0);
 
         if result != "ok" {
             log::error!("Database integrity check failed: {}", result);
@@ -472,6 +473,55 @@ impl Database {
         let checker = IntegrityCheckerFactory::create_development_checker(self.pool.clone());
         checker.check_integrity().await
             .context("Failed to perform fast integrity check")
+    }
+
+    /// Performs comprehensive database compaction with full optimization.
+    /// 
+    /// Business Logic:
+    /// - Executes full database maintenance routine with VACUUM operations
+    /// - Creates backup before compaction if configured
+    /// - Performs index optimization and statistics updates
+    /// - Verifies integrity after compaction operations
+    /// - Provides detailed reporting of space reclamation and performance improvements
+    pub async fn compact_database(&self) -> Result<CompactionResult> {
+        let compactor = DatabaseCompactorFactory::create_production_compactor(
+            self.pool.clone(), 
+            self.db_path.clone()
+        );
+        compactor.perform_compaction().await
+            .context("Failed to perform database compaction")
+    }
+
+    /// Performs incremental vacuum for lightweight maintenance.
+    /// 
+    /// Business Logic:
+    /// - Executes incremental vacuum for minimal downtime
+    /// - Suitable for frequent maintenance operations
+    /// - Reclaims free pages without full database rebuild
+    /// - Provides faster execution with moderate space savings
+    pub async fn compact_database_incremental(&self, pages_to_free: Option<u32>) -> Result<CompactionResult> {
+        let compactor = DatabaseCompactorFactory::create_development_compactor(
+            self.pool.clone(), 
+            self.db_path.clone()
+        );
+        compactor.perform_incremental_vacuum(pages_to_free).await
+            .context("Failed to perform incremental database compaction")
+    }
+
+    /// Checks if database compaction is recommended based on current metrics.
+    /// 
+    /// Business Logic:
+    /// - Analyzes database health indicators
+    /// - Compares against configuration thresholds
+    /// - Provides recommendations with reasoning
+    /// - Supports automated maintenance triggers
+    pub async fn is_compaction_recommended(&self) -> Result<(bool, Vec<String>)> {
+        let compactor = DatabaseCompactorFactory::create_production_compactor(
+            self.pool.clone(), 
+            self.db_path.clone()
+        );
+        compactor.is_compaction_recommended().await
+            .context("Failed to check compaction recommendation")
     }
 }
 

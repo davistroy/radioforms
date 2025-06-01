@@ -18,7 +18,7 @@
  * - No complex relationships to maintain simplicity
  */
 
-use sqlx::FromRow;
+use sqlx::{FromRow, Type};
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
@@ -160,7 +160,7 @@ pub struct Form {
     pub id: i64,
     
     /// Type of ICS form (ICS-201, ICS-202, etc.) - stored as string
-    form_type: String,
+    pub form_type: String,
     
     /// Name of the incident this form relates to
     pub incident_name: String,
@@ -169,7 +169,7 @@ pub struct Form {
     pub incident_number: Option<String>,
     
     /// Current status of the form (draft, completed, final) - stored as string
-    status: String,
+    pub status: String,
     
     /// Complete form data as JSON
     /// Contains all field values specific to the form type
@@ -190,7 +190,7 @@ pub struct Form {
 
 impl Form {
     /// Gets the form type as an enum
-    pub fn form_type(&self) -> anyhow::Result<ICSFormType> {
+    pub fn get_form_type(&self) -> anyhow::Result<ICSFormType> {
         self.form_type.parse()
     }
     
@@ -200,7 +200,7 @@ impl Form {
     }
     
     /// Gets the status as an enum
-    pub fn status(&self) -> anyhow::Result<FormStatus> {
+    pub fn get_status(&self) -> anyhow::Result<FormStatus> {
         self.status.parse()
     }
     

@@ -19,7 +19,7 @@
  * - Enable safe migration execution in production environments
  */
 
-use sqlx::SqlitePool;
+use sqlx::{SqlitePool, Row};
 use anyhow::{Result, Context};
 use std::path::PathBuf;
 use crate::database::migrations::{MigrationManager, MigrationConfig, MigrationResult};
@@ -274,12 +274,12 @@ impl MigrationRunner {
         let mut history = Vec::new();
         for row in rows {
             history.push(MigrationHistoryEntry {
-                version: row.try_get("version")?,
-                description: row.try_get("description")?,
-                installed_on: row.try_get("installed_on")?,
-                success: row.try_get("success")?,
-                execution_time_ms: row.try_get("execution_time_ms").unwrap_or(0),
-                checksum: row.try_get("checksum")?,
+                version: row.get("version"),
+                description: row.get("description"),
+                installed_on: row.get("installed_on"),
+                success: row.get("success"),
+                execution_time_ms: row.get("execution_time_ms"),
+                checksum: row.get("checksum"),
             });
         }
         

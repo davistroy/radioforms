@@ -22,6 +22,43 @@ use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc, NaiveDate, NaiveTime};
 use std::collections::HashMap;
 
+/// Incident priority levels as defined by ICS standards.
+/// Used for classification and resource allocation decisions.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum IncidentPriority {
+    /// Routine incident with normal response
+    Low,
+    /// Incident requiring elevated response
+    Medium,
+    /// Critical incident requiring immediate response
+    High,
+    /// Emergency requiring maximum resources
+    Critical,
+}
+
+impl std::fmt::Display for IncidentPriority {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IncidentPriority::Low => write!(f, "Low"),
+            IncidentPriority::Medium => write!(f, "Medium"),
+            IncidentPriority::High => write!(f, "High"),
+            IncidentPriority::Critical => write!(f, "Critical"),
+        }
+    }
+}
+
+/// Contact information structure for personnel.
+/// Used to track communication methods for ICS personnel.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ContactInfo {
+    /// Primary phone number
+    pub phone: Option<String>,
+    /// Email address for communications
+    pub email: Option<String>,
+    /// Radio callsign or frequency
+    pub radio_callsign: Option<String>,
+}
+
 /// Universal header structure present in all ICS forms.
 /// 
 /// Business Logic:
@@ -224,7 +261,7 @@ pub struct PersonPosition {
     pub agency: Option<String>,
     
     /// Contact information (phone, radio, etc.)
-    pub contact_info: Option<String>,
+    pub contact_info: Option<ContactInfo>,
 }
 
 /// Field type enumeration for form field definitions.

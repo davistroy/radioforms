@@ -25,6 +25,7 @@ use sqlx::{SqlitePool, Transaction, Sqlite};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use anyhow::{Result, anyhow};
 
 use crate::database::schema::{Form, FormStatus, ICSFormType, FormRelationship, FormStatusHistory, FormSignature, FormTemplate, ValidationRule, ExportConfiguration};
 use crate::database::transactions::{TransactionResult, TransactionManager};
@@ -739,7 +740,7 @@ impl CrudOperations {
 }
 
 /// Re-export transaction result for convenience
-pub use crate::database::transactions::TransactionResult;
+// Note: TransactionResult is already imported above, so no need to re-export
 
 #[cfg(test)]
 mod tests {
