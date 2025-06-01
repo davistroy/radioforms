@@ -189,6 +189,21 @@ impl TemplateLoader {
         self.templates.contains_key(form_type)
     }
     
+    /// Gets embedded resource information.
+    pub fn get_resource_info(&self) -> TemplateResourceInfo {
+        TemplateResources::get_resource_info()
+    }
+    
+    /// Gets available embedded form types.
+    pub fn get_embedded_form_types(&self) -> Vec<String> {
+        TemplateResources::get_available_form_types()
+    }
+    
+    /// Checks if running in embedded mode (release) or file system mode (debug).
+    pub fn is_embedded_mode(&self) -> bool {
+        !cfg!(debug_assertions)
+    }
+    
     /// Gets template statistics.
     pub fn get_template_stats(&self) -> TemplateStats {
         let mut stats = TemplateStats {
@@ -198,6 +213,7 @@ impl TemplateLoader {
             total_validation_rules: 0,
             form_types: Vec::new(),
             version_info: Vec::new(),
+            resource_info: TemplateResources::get_resource_info(),
         };
         
         for (form_type, template) in &self.templates {
@@ -231,21 +247,10 @@ impl TemplateLoader {
     
     /// Gets embedded template definitions.
     /// 
-    /// For now, this loads templates from the file system for development.
-    /// In production, this would use include_str! to embed template files 
-    /// as compile-time resources.
+    /// Uses the TemplateResources module for compile-time embedded access.
+    /// Templates are embedded into the binary using include_str! macro.
     fn get_embedded_template_definitions(&self) -> Vec<(String, String)> {
-        let mut templates = Vec::new();
-        
-        // For development, try to load from the templates directory
-        if let Ok(ics_201) = std::fs::read_to_string("templates/ics-201.json") {
-            templates.push(("ICS-201".to_string(), ics_201));
-        } else {
-            // Fallback to a minimal embedded template for testing
-            templates.push(("ICS-201".to_string(), self.get_minimal_ics_201_template()));
-        }
-        
-        templates
+        TemplateResources::get_all_embedded_templates()
     }
     
     /// Gets a minimal ICS-201 template for testing when file loading fails.
@@ -343,6 +348,7 @@ pub struct TemplateStats {
     pub total_validation_rules: usize,
     pub form_types: Vec<String>,
     pub version_info: Vec<(String, String)>, // (form_type, version)
+    pub resource_info: TemplateResourceInfo,
 }
 
 impl TemplateStats {
