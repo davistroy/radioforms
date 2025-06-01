@@ -18,26 +18,35 @@
  * - Transaction safety for data integrity
  */
 
-use sqlx::{SqlitePool, migrate::MigrateDatabase, Sqlite, Row};
+use sqlx::{SqlitePool, sqlite::SqlitePoolOptions, migrate::MigrateDatabase, Sqlite, Row};
 use std::path::PathBuf;
 use std::env;
+use std::time::Duration;
 use anyhow::{Result, Context};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use crate::database::migration_runner::{MigrationRunner, MigrationRunnerFactory};
+use crate::database::transactions::{TransactionManager, TransactionResult, TransactionStatsSnapshot};
+use crate::database::crud_operations::CrudOperations;
+use crate::database::errors::{DatabaseError, DatabaseResult, ErrorContext};
 
 pub mod schema;
 pub mod migrations;
 pub mod migration_runner;
+pub mod transactions;
+pub mod crud_operations;
+pub mod errors;
 
 #[cfg(test)]
 mod migration_tests;
 
 /// Database connection manager for the RadioForms application.
-/// Handles SQLite database initialization, migrations, and connection pooling.
+/// Handles SQLite database initialization, migrations, connection pooling, and transactions.
 pub struct Database {
     pool: SqlitePool,
     db_path: PathBuf,
+    transaction_manager: TransactionManager,
+    crud_operations: CrudOperations,
 }
 
 impl Database {
@@ -67,14 +76,39 @@ impl Database {
                 .context("Failed to create database")?;
         }
 
-        // Create connection pool
-        let pool = SqlitePool::connect(&db_url).await
-            .context("Failed to connect to database")?;
+        // Create optimized connection pool with specific parameters
+        // Following Task 2.1 requirements: max 10 connections, proper timeouts
+        let pool = SqlitePoolOptions::new()
+            .max_connections(10)  // Task requirement: max 10 connections
+            .min_connections(1)   // Keep at least one connection open
+            .acquire_timeout(Duration::from_secs(30))  // 30 second acquire timeout
+            .idle_timeout(Duration::from_secs(300))    // 5 minute idle timeout
+            .max_lifetime(Duration::from_secs(1800))   // 30 minute max lifetime
+            .test_before_acquire(true)  // Test connections before use
+            .connect(&db_url).await
+            .context("Failed to create database connection pool")?;
 
-        let database = Self { pool, db_path };
+        // Initialize transaction manager
+        let transaction_manager = TransactionManager::new(pool.clone());
+        
+        // Initialize CRUD operations with enhanced transaction support
+        let crud_operations = CrudOperations::new(pool.clone());
+        
+        let database = Self { 
+            pool, 
+            db_path,
+            transaction_manager,
+            crud_operations,
+        };
+        
+        // Configure SQLite connection settings for optimal performance
+        database.configure_sqlite_pragmas().await?;
         
         // Run migrations
         database.run_migrations().await?;
+        
+        // Log connection pool status
+        log::info!("Database connection pool initialized: max_connections=10, idle_timeout=300s");
         
         Ok(database)
     }
@@ -146,6 +180,18 @@ impl Database {
     /// Gets the database file path for backup operations.
     pub fn database_path(&self) -> &PathBuf {
         &self.db_path
+    }
+
+    /// Gets a reference to the CRUD operations manager.
+    /// Provides enterprise-grade database operations with transaction support.
+    /// 
+    /// Business Logic:
+    /// - Returns comprehensive CRUD operations with validation
+    /// - Includes transaction support and optimistic locking
+    /// - Provides search capabilities with pagination
+    /// - Supports advanced form management operations
+    pub fn crud(&self) -> &CrudOperations {
+        &self.crud_operations
     }
 
     /// Closes the database connection gracefully.
@@ -230,6 +276,195 @@ impl Database {
         log::info!("Database integrity check passed");
         Ok(true)
     }
+
+    /// Configures SQLite PRAGMA settings for optimal performance and safety.
+    /// 
+    /// Business Logic:
+    /// - Sets WAL mode for better concurrency and crash safety
+    /// - Configures journal mode for data integrity
+    /// - Sets synchronous mode for performance/safety balance
+    /// - Enables foreign key constraints
+    /// - Sets appropriate cache sizes and timeouts
+    async fn configure_sqlite_pragmas(&self) -> Result<()> {
+        log::info!("Configuring SQLite PRAGMA settings for optimal performance...");
+        
+        // Enable WAL mode for better concurrency and crash safety
+        sqlx::query("PRAGMA journal_mode = WAL")
+            .execute(&self.pool)
+            .await
+            .context("Failed to set WAL journal mode")?;
+        
+        // Set synchronous mode to NORMAL for good performance/safety balance
+        sqlx::query("PRAGMA synchronous = NORMAL")
+            .execute(&self.pool)
+            .await
+            .context("Failed to set synchronous mode")?;
+        
+        // Enable foreign key constraints (critical for data integrity)
+        sqlx::query("PRAGMA foreign_keys = ON")
+            .execute(&self.pool)
+            .await
+            .context("Failed to enable foreign key constraints")?;
+        
+        // Set cache size to 64MB (16384 pages * 4KB = 64MB)
+        sqlx::query("PRAGMA cache_size = -65536")  // Negative value means KB
+            .execute(&self.pool)
+            .await
+            .context("Failed to set cache size")?;
+        
+        // Set busy timeout to 30 seconds
+        sqlx::query("PRAGMA busy_timeout = 30000")
+            .execute(&self.pool)
+            .await
+            .context("Failed to set busy timeout")?;
+        
+        // Set temp store to memory for better performance
+        sqlx::query("PRAGMA temp_store = MEMORY")
+            .execute(&self.pool)
+            .await
+            .context("Failed to set temp store mode")?;
+        
+        // Set mmap size to 256MB for better I/O performance
+        sqlx::query("PRAGMA mmap_size = 268435456")
+            .execute(&self.pool)
+            .await
+            .context("Failed to set mmap size")?;
+        
+        log::info!("SQLite PRAGMA settings configured successfully");
+        Ok(())
+    }
+
+    /// Gets connection pool statistics for monitoring.
+    /// 
+    /// Business Logic:
+    /// - Provides insight into connection pool utilization
+    /// - Helps identify connection leaks or performance issues
+    /// - Useful for debugging and optimization
+    pub fn get_pool_stats(&self) -> ConnectionPoolStats {
+        ConnectionPoolStats {
+            size: self.pool.size(),
+            idle: self.pool.num_idle(),
+            is_closed: self.pool.is_closed(),
+            max_connections: 10, // Our configured max
+        }
+    }
+
+    /// Performs connection pool health check.
+    /// 
+    /// Business Logic:
+    /// - Verifies pool is operational and responsive
+    /// - Tests connection acquisition and basic query execution
+    /// - Provides health status for monitoring systems
+    pub async fn check_pool_health(&self) -> Result<bool> {
+        // Try to acquire a connection and run a simple query
+        let result = sqlx::query_scalar::<_, i64>("SELECT 1")
+            .fetch_one(&self.pool)
+            .await;
+        
+        match result {
+            Ok(1) => {
+                log::debug!("Connection pool health check passed");
+                Ok(true)
+            },
+            Ok(val) => {
+                log::warn!("Connection pool health check returned unexpected value: {}", val);
+                Ok(false)
+            },
+            Err(e) => {
+                log::error!("Connection pool health check failed: {}", e);
+                Ok(false)
+            }
+        }
+    }
+
+    /// Executes a function within a database transaction with automatic rollback on error.
+    /// 
+    /// Business Logic:
+    /// - Provides atomic operations for multiple database changes
+    /// - Automatically rolls back on any error to maintain consistency
+    /// - Tracks transaction performance and statistics
+    /// - Supports complex business operations requiring multiple SQL statements
+    pub async fn execute_transaction<F, T, E>(&self, operation: F) -> Result<TransactionResult<T>>
+    where
+        F: for<'c> FnOnce(&mut sqlx::Transaction<'c, sqlx::Sqlite>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, E>> + Send + 'c>>,
+        T: Send + 'static,
+        E: Into<anyhow::Error> + Send + 'static,
+    {
+        self.transaction_manager.execute_transaction(operation).await
+    }
+
+    /// Executes multiple operations in a single transaction with batch optimization.
+    /// 
+    /// Business Logic:
+    /// - Optimizes performance for multiple related operations
+    /// - Ensures all operations succeed or all fail (atomicity)
+    /// - Reduces transaction overhead for bulk operations
+    /// - Provides detailed reporting on batch operation results
+    pub async fn execute_batch_transaction<F, T>(&self, operations: Vec<F>) -> Result<Vec<TransactionResult<T>>>
+    where
+        F: for<'c> FnOnce(&mut sqlx::Transaction<'c, sqlx::Sqlite>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T>> + Send + 'c>>,
+        T: Send + Default + 'static,
+    {
+        self.transaction_manager.execute_batch_transaction(operations).await
+    }
+
+    /// Executes an operation with retry logic for handling temporary failures.
+    /// 
+    /// Business Logic:
+    /// - Automatically retries transient database errors
+    /// - Uses exponential backoff to avoid overwhelming database
+    /// - Distinguishes between retryable and permanent errors
+    /// - Provides comprehensive retry attempt logging
+    pub async fn execute_with_retry<F, T, E>(&self, max_retries: u32, operation: F) -> Result<TransactionResult<T>>
+    where
+        F: Fn() -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, E>> + Send>> + Send + Sync,
+        T: Send + Default + 'static,
+        E: Into<anyhow::Error> + Send + 'static,
+    {
+        self.transaction_manager.execute_with_retry(max_retries, operation).await
+    }
+
+    /// Gets current transaction statistics for monitoring and performance analysis.
+    /// 
+    /// Business Logic:
+    /// - Provides real-time transaction performance metrics
+    /// - Enables monitoring dashboard integration
+    /// - Supports performance optimization decisions
+    /// - Tracks database health indicators
+    pub fn get_transaction_stats(&self) -> TransactionStatsSnapshot {
+        self.transaction_manager.get_stats()
+    }
+
+    /// Resets transaction statistics (useful for testing or monitoring periods).
+    /// 
+    /// Business Logic:
+    /// - Enables clean measurement windows for performance testing
+    /// - Supports periodic statistics reporting
+    /// - Useful for benchmarking and optimization efforts
+    pub fn reset_transaction_stats(&self) {
+        self.transaction_manager.reset_stats();
+    }
+}
+
+/// Connection pool statistics for monitoring.
+/// 
+/// Business Logic:
+/// - Provides real-time pool status information
+/// - Enables monitoring of connection utilization
+/// - Supports performance optimization and debugging
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ConnectionPoolStats {
+    /// Current number of connections in the pool
+    pub size: u32,
+    
+    /// Number of idle connections available
+    pub idle: usize,
+    
+    /// Whether the pool is closed
+    pub is_closed: bool,
+    
+    /// Maximum configured connections
+    pub max_connections: u32,
 }
 
 /// Database statistics for monitoring and debugging.

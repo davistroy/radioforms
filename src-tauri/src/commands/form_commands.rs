@@ -1,24 +1,27 @@
 /*!
- * Form-related Tauri commands
+ * Form-related Tauri commands - Enhanced with Enterprise CRUD Operations
  * 
  * This module contains all Tauri commands related to form management.
  * These commands handle CRUD operations, search, and form lifecycle
- * management.
+ * management using the enhanced enterprise-grade operations.
  * 
  * Business Logic:
- * - All form operations go through the FormModel for consistency
+ * - All form operations go through the enhanced FormModel for consistency
  * - Proper error handling with user-friendly messages
  * - Input validation for all command parameters
  * - Comprehensive logging for debugging and audit
+ * - Transaction support and optimistic locking
  */
 
 use tauri::State;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use chrono::{DateTime, Utc};
 
 use crate::database::Database;
-use crate::models::{FormModel, CreateFormRequest, UpdateFormRequest, FormFilters, Form, FormSearchResult, ICSFormType, FormStatus};
+use crate::models::form::{FormModel, CreateFormRequest, UpdateFormRequest, FormFilters, FormSearchResult};
+use crate::database::schema::{Form, ICSFormType, FormStatus};
 
 /// Application state containing database connection
 pub type AppState = Arc<Mutex<Database>>;
@@ -39,13 +42,13 @@ impl From<anyhow::Error> for ErrorResponse {
     }
 }
 
-/// Creates a new form with the specified data.
+/// Creates a new form with comprehensive validation and transaction support.
 /// 
 /// Business Logic:
-/// - Validates all required fields are present
-/// - Sets initial form status to Draft
-/// - Creates form with current timestamp
-/// - Returns the created form with assigned ID
+/// - Uses enterprise CRUD operations for enhanced validation
+/// - Supports operational period validation per ICS standards
+/// - Provides transaction safety and rollback support
+/// - Supports template-based form creation
 /// 
 /// Frontend Usage:
 /// ```typescript
@@ -53,7 +56,11 @@ impl From<anyhow::Error> for ErrorResponse {
 ///   formType: 'ICS-201',
 ///   incidentName: 'Forest Fire Response',
 ///   incidentNumber: 'FF-2024-001',
-///   preparerName: 'John Smith'
+///   preparerName: 'John Smith',
+///   operationalPeriodStart: '2024-01-01T08:00:00Z',
+///   operationalPeriodEnd: '2024-01-01T20:00:00Z',
+///   templateId: 1,
+///   priority: 'urgent'
 /// });
 /// ```
 #[tauri::command]
@@ -63,6 +70,10 @@ pub async fn create_form(
     incident_number: Option<String>,
     preparer_name: Option<String>,
     initial_data: Option<std::collections::HashMap<String, serde_json::Value>>,
+    operational_period_start: Option<String>,
+    operational_period_end: Option<String>,
+    template_id: Option<i64>,
+    priority: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Form, ErrorResponse> {
     log::info!("Creating new form: type={}, incident={}", form_type, incident_name);
@@ -81,8 +92,40 @@ pub async fn create_form(
             details: Some(e.to_string()),
         })?;
 
+    // Parse operational period dates if provided
+    let operational_period_start = if let Some(date_str) = operational_period_start {
+        Some(DateTime::parse_from_rfc3339(&date_str)
+            .map_err(|e| ErrorResponse {
+                error: "Invalid operational period start date".to_string(),
+                details: Some(e.to_string()),
+            })?
+            .with_timezone(&Utc))
+    } else {
+        None
+    };
+
+    let operational_period_end = if let Some(date_str) = operational_period_end {
+        Some(DateTime::parse_from_rfc3339(&date_str)
+            .map_err(|e| ErrorResponse {
+                error: "Invalid operational period end date".to_string(),
+                details: Some(e.to_string()),
+            })?
+            .with_timezone(&Utc))
+    } else {
+        None
+    };
+
+    // Get database and create enhanced FormModel
     let db = state.lock().await;
-    let form_model = FormModel::new(db.pool().clone());
+    
+    // We need to clone the database for the FormModel
+    // This is a temporary approach - in a production system, we might use Arc<Database>
+    let database_clone = Database::new().await.map_err(|e| ErrorResponse {
+        error: "Failed to create database connection".to_string(),
+        details: Some(e.to_string()),
+    })?;
+    
+    let form_model = FormModel::new(database_clone);
 
     let request = CreateFormRequest {
         form_type,
@@ -90,6 +133,10 @@ pub async fn create_form(
         incident_number,
         preparer_name,
         initial_data,
+        operational_period_start,
+        operational_period_end,
+        template_id,
+        priority,
     };
 
     let form = form_model.create_form(request).await?;
@@ -98,12 +145,12 @@ pub async fn create_form(
     Ok(form)
 }
 
-/// Retrieves a form by its ID.
+/// Retrieves a form by its ID with comprehensive error handling.
 /// 
 /// Business Logic:
-/// - Returns complete form data including JSON fields
+/// - Uses enhanced CRUD operations for validation
+/// - Provides detailed error messages for invalid IDs
 /// - Returns null if form doesn't exist
-/// - Validates ID parameter
 /// 
 /// Frontend Usage:
 /// ```typescript
@@ -127,7 +174,14 @@ pub async fn get_form(
     }
 
     let db = state.lock().await;
-    let form_model = FormModel::new(db.pool().clone());
+    
+    // Create database clone for FormModel
+    let database_clone = Database::new().await.map_err(|e| ErrorResponse {
+        error: "Failed to create database connection".to_string(),
+        details: Some(e.to_string()),
+    })?;
+    
+    let form_model = FormModel::new(database_clone);
 
     let form = form_model.get_form_by_id(id).await?;
     
@@ -140,29 +194,40 @@ pub async fn get_form(
     Ok(form)
 }
 
-/// Updates an existing form with new data.
+/// Updates an existing form with optimistic locking and comprehensive validation.
 /// 
 /// Business Logic:
-/// - Validates form exists before updating
-/// - Checks status transition validity
-/// - Updates only provided fields (partial updates)
-/// - Automatically updates modified timestamp
+/// - Uses enterprise CRUD operations for comprehensive validation
+/// - Supports optimistic locking to prevent conflicts
+/// - Validates status transitions and business rules
+/// - Provides transaction safety and audit trail
 /// 
 /// Frontend Usage:
 /// ```typescript
 /// const updatedForm = await invoke('update_form', {
 ///   id: 123,
 ///   updates: {
-///     incident_name: 'Updated Incident Name',
+///     incidentName: 'Updated Incident Name',
 ///     status: 'completed',
-///     data: { field1: 'value1', field2: 'value2' }
+///     data: { field1: 'value1', field2: 'value2' },
+///     expectedVersion: 5  // For optimistic locking
 ///   }
 /// });
 /// ```
 #[tauri::command]
 pub async fn update_form(
     id: i64,
-    updates: UpdateFormRequest,
+    incident_name: Option<String>,
+    incident_number: Option<String>,
+    status: Option<String>,
+    data: Option<std::collections::HashMap<String, serde_json::Value>>,
+    notes: Option<String>,
+    preparer_name: Option<String>,
+    operational_period_start: Option<String>,
+    operational_period_end: Option<String>,
+    priority: Option<String>,
+    workflow_position: Option<String>,
+    expected_version: Option<i64>,
     state: State<'_, AppState>,
 ) -> Result<Form, ErrorResponse> {
     log::info!("Updating form: id={}", id);
@@ -174,8 +239,63 @@ pub async fn update_form(
         });
     }
 
+    // Parse status if provided
+    let status = if let Some(status_str) = status {
+        Some(status_str.parse::<FormStatus>()
+            .map_err(|e: anyhow::Error| ErrorResponse {
+                error: format!("Invalid status: {}", status_str),
+                details: Some(e.to_string()),
+            })?)
+    } else {
+        None
+    };
+
+    // Parse operational period dates if provided
+    let operational_period_start = if let Some(date_str) = operational_period_start {
+        Some(DateTime::parse_from_rfc3339(&date_str)
+            .map_err(|e| ErrorResponse {
+                error: "Invalid operational period start date".to_string(),
+                details: Some(e.to_string()),
+            })?
+            .with_timezone(&Utc))
+    } else {
+        None
+    };
+
+    let operational_period_end = if let Some(date_str) = operational_period_end {
+        Some(DateTime::parse_from_rfc3339(&date_str)
+            .map_err(|e| ErrorResponse {
+                error: "Invalid operational period end date".to_string(),
+                details: Some(e.to_string()),
+            })?
+            .with_timezone(&Utc))
+    } else {
+        None
+    };
+
     let db = state.lock().await;
-    let form_model = FormModel::new(db.pool().clone());
+    
+    // Create database clone for FormModel
+    let database_clone = Database::new().await.map_err(|e| ErrorResponse {
+        error: "Failed to create database connection".to_string(),
+        details: Some(e.to_string()),
+    })?;
+    
+    let form_model = FormModel::new(database_clone);
+
+    let updates = UpdateFormRequest {
+        incident_name,
+        incident_number,
+        status,
+        data,
+        notes,
+        preparer_name,
+        operational_period_start,
+        operational_period_end,
+        priority,
+        workflow_position,
+        expected_version,
+    };
 
     let form = form_model.update_form(id, updates).await?;
     
@@ -183,12 +303,13 @@ pub async fn update_form(
     Ok(form)
 }
 
-/// Deletes a form by ID.
+/// Deletes a form with proper validation and cascade handling.
 /// 
 /// Business Logic:
-/// - Only allows deletion of draft forms by default
-/// - Requires force flag to delete completed/final forms
-/// - Returns true if form was deleted, false if not found
+/// - Uses enterprise CRUD operations for validation
+/// - Handles cascade deletion of related records
+/// - Validates deletion permissions based on form status
+/// - Provides force deletion option for administrative purposes
 /// 
 /// Frontend Usage:
 /// ```typescript
@@ -213,7 +334,14 @@ pub async fn delete_form(
     }
 
     let db = state.lock().await;
-    let form_model = FormModel::new(db.pool().clone());
+    
+    // Create database clone for FormModel
+    let database_clone = Database::new().await.map_err(|e| ErrorResponse {
+        error: "Failed to create database connection".to_string(),
+        details: Some(e.to_string()),
+    })?;
+    
+    let form_model = FormModel::new(database_clone);
 
     let deleted = form_model.delete_form(id, force.unwrap_or(false)).await?;
     
@@ -226,48 +354,131 @@ pub async fn delete_form(
     Ok(deleted)
 }
 
-/// Searches forms based on provided filters.
+/// Searches forms with comprehensive filtering and pagination.
 /// 
 /// Business Logic:
-/// - Supports partial text matching for incident names
-/// - Filters by form type, status, preparer, and date ranges
-/// - Includes pagination with limit and offset
-/// - Returns total count for pagination UI
+/// - Uses enterprise CRUD operations for optimized search
+/// - Supports multiple filter criteria with efficient indexing
+/// - Provides pagination for large result sets
+/// - Includes search performance metrics
 /// 
 /// Frontend Usage:
 /// ```typescript
 /// const results = await invoke('search_forms', {
 ///   filters: {
-///     incident_name: 'Fire',
+///     incidentName: 'Fire',
 ///     status: 'completed',
 ///     limit: 20,
-///     offset: 0
+///     offset: 0,
+///     orderBy: 'updated_at',
+///     orderDirection: 'DESC'
 ///   }
 /// });
-/// console.log(`Found ${results.total_count} forms`);
+/// console.log(`Found ${results.total_count} forms in ${results.search_time_ms}ms`);
 /// ```
 #[tauri::command]
 pub async fn search_forms(
-    filters: FormFilters,
+    incident_name: Option<String>,
+    form_type: Option<String>,
+    status: Option<String>,
+    preparer_name: Option<String>,
+    date_from: Option<String>,
+    date_to: Option<String>,
+    priority: Option<String>,
+    workflow_position: Option<String>,
+    full_text_search: Option<String>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+    order_by: Option<String>,
+    order_direction: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<FormSearchResult, ErrorResponse> {
-    log::debug!("Searching forms with filters: {:?}", filters);
+    log::debug!("Searching forms with enhanced filters");
+
+    // Parse form type if provided
+    let form_type = if let Some(type_str) = form_type {
+        Some(type_str.parse::<ICSFormType>()
+            .map_err(|e: anyhow::Error| ErrorResponse {
+                error: format!("Invalid form type: {}", type_str),
+                details: Some(e.to_string()),
+            })?)
+    } else {
+        None
+    };
+
+    // Parse status if provided
+    let status = if let Some(status_str) = status {
+        Some(status_str.parse::<FormStatus>()
+            .map_err(|e: anyhow::Error| ErrorResponse {
+                error: format!("Invalid status: {}", status_str),
+                details: Some(e.to_string()),
+            })?)
+    } else {
+        None
+    };
+
+    // Parse dates if provided
+    let date_from = if let Some(date_str) = date_from {
+        Some(DateTime::parse_from_rfc3339(&date_str)
+            .map_err(|e| ErrorResponse {
+                error: "Invalid date_from format".to_string(),
+                details: Some(e.to_string()),
+            })?
+            .with_timezone(&Utc))
+    } else {
+        None
+    };
+
+    let date_to = if let Some(date_str) = date_to {
+        Some(DateTime::parse_from_rfc3339(&date_str)
+            .map_err(|e| ErrorResponse {
+                error: "Invalid date_to format".to_string(),
+                details: Some(e.to_string()),
+            })?
+            .with_timezone(&Utc))
+    } else {
+        None
+    };
 
     let db = state.lock().await;
-    let form_model = FormModel::new(db.pool().clone());
+    
+    // Create database clone for FormModel
+    let database_clone = Database::new().await.map_err(|e| ErrorResponse {
+        error: "Failed to create database connection".to_string(),
+        details: Some(e.to_string()),
+    })?;
+    
+    let form_model = FormModel::new(database_clone);
+
+    let filters = FormFilters {
+        incident_name,
+        form_type,
+        status,
+        preparer_name,
+        date_from,
+        date_to,
+        priority,
+        workflow_position,
+        full_text_search,
+        limit,
+        offset,
+        order_by,
+        order_direction,
+    };
 
     let result = form_model.search_forms(filters).await?;
     
-    log::debug!("Search completed: found {} forms", result.forms.len());
+    log::debug!("Search completed: found {} forms in {}ms", 
+               result.forms.len(), result.search_time_ms);
     Ok(result)
 }
 
 /// Gets all forms for a specific incident.
 /// 
 /// Business Logic:
+/// - Uses enhanced search capabilities for incident filtering
 /// - Returns all forms (all statuses) for the specified incident
 /// - Sorted by form type for logical ordering
-/// - Useful for incident-specific dashboards
 /// 
 /// Frontend Usage:
 /// ```typescript
@@ -290,7 +501,14 @@ pub async fn get_forms_by_incident(
     }
 
     let db = state.lock().await;
-    let form_model = FormModel::new(db.pool().clone());
+    
+    // Create database clone for FormModel
+    let database_clone = Database::new().await.map_err(|e| ErrorResponse {
+        error: "Failed to create database connection".to_string(),
+        details: Some(e.to_string()),
+    })?;
+    
+    let form_model = FormModel::new(database_clone);
 
     let forms = form_model.get_forms_by_incident(&incident_name).await?;
     
@@ -298,11 +516,11 @@ pub async fn get_forms_by_incident(
     Ok(forms)
 }
 
-/// Gets recent forms (most recently updated).
+/// Gets recent forms with enhanced ordering and performance.
 /// 
 /// Business Logic:
+/// - Uses enhanced search capabilities with ordering
 /// - Returns forms ordered by last update time (newest first)
-/// - Useful for dashboard "recent activity" sections
 /// - Limited to reasonable number for performance
 /// 
 /// Frontend Usage:
@@ -317,7 +535,14 @@ pub async fn get_recent_forms(
     log::debug!("Fetching recent forms: limit={:?}", limit);
 
     let db = state.lock().await;
-    let form_model = FormModel::new(db.pool().clone());
+    
+    // Create database clone for FormModel
+    let database_clone = Database::new().await.map_err(|e| ErrorResponse {
+        error: "Failed to create database connection".to_string(),
+        details: Some(e.to_string()),
+    })?;
+    
+    let form_model = FormModel::new(database_clone);
 
     let forms = form_model.get_recent_forms(limit).await?;
     
@@ -325,9 +550,10 @@ pub async fn get_recent_forms(
     Ok(forms)
 }
 
-/// Duplicates an existing form as a new draft.
+/// Duplicates an existing form as a new draft with enhanced capabilities.
 /// 
 /// Business Logic:
+/// - Uses enterprise CRUD operations for consistency
 /// - Creates a copy of an existing form
 /// - New form starts as Draft status
 /// - Updates preparation date/time to current
@@ -356,7 +582,14 @@ pub async fn duplicate_form(
     }
 
     let db = state.lock().await;
-    let form_model = FormModel::new(db.pool().clone());
+    
+    // Create database clone for FormModel
+    let database_clone = Database::new().await.map_err(|e| ErrorResponse {
+        error: "Failed to create database connection".to_string(),
+        details: Some(e.to_string()),
+    })?;
+    
+    let form_model = FormModel::new(database_clone);
 
     let form = form_model.duplicate_form(source_id, new_incident_name).await?;
     
@@ -364,12 +597,12 @@ pub async fn duplicate_form(
     Ok(form)
 }
 
-/// Gets list of all supported ICS form types.
+/// Gets list of all supported ICS form types with enhanced metadata.
 /// 
 /// Business Logic:
-/// - Returns metadata about all supported form types
+/// - Returns comprehensive metadata about all supported form types
 /// - Useful for form type selection dropdowns
-/// - Includes form descriptions and categories
+/// - Includes form descriptions, categories, and complexity ratings
 /// 
 /// Frontend Usage:
 /// ```typescript
@@ -378,7 +611,7 @@ pub async fn duplicate_form(
 /// ```
 #[tauri::command]
 pub async fn get_form_types() -> Result<Vec<FormTypeInfo>, ErrorResponse> {
-    log::debug!("Fetching supported form types");
+    log::debug!("Fetching supported form types with enhanced metadata");
 
     let form_types = vec![
         FormTypeInfo { 
@@ -386,101 +619,138 @@ pub async fn get_form_types() -> Result<Vec<FormTypeInfo>, ErrorResponse> {
             name: "Incident Briefing".to_string(),
             description: "Initial incident briefing and situation assessment".to_string(),
             category: "Planning".to_string(),
+            complexity: "Medium".to_string(),
+            typical_duration_minutes: 30,
         },
         FormTypeInfo { 
             code: "ICS-202".to_string(), 
             name: "Incident Objectives".to_string(),
             description: "Incident objectives, priorities, and safety considerations".to_string(),
             category: "Planning".to_string(),
+            complexity: "Medium".to_string(),
+            typical_duration_minutes: 45,
         },
         FormTypeInfo { 
             code: "ICS-203".to_string(), 
             name: "Organization Assignment List".to_string(),
             description: "Incident organization and personnel assignments".to_string(),
             category: "Planning".to_string(),
+            complexity: "High".to_string(),
+            typical_duration_minutes: 60,
         },
         FormTypeInfo { 
             code: "ICS-204".to_string(), 
             name: "Assignment List".to_string(),
             description: "Assignment of operational personnel and resources".to_string(),
             category: "Operations".to_string(),
+            complexity: "Medium".to_string(),
+            typical_duration_minutes: 25,
         },
         FormTypeInfo { 
             code: "ICS-205".to_string(), 
             name: "Incident Radio Communications Plan".to_string(),
             description: "Radio frequency assignments and communication procedures".to_string(),
             category: "Communications".to_string(),
+            complexity: "High".to_string(),
+            typical_duration_minutes: 40,
         },
         // Additional form types would be added here...
     ];
 
-    log::debug!("Returned {} form types", form_types.len());
+    log::debug!("Returned {} form types with enhanced metadata", form_types.len());
     Ok(form_types)
 }
 
-/// Form type information for frontend display
+/// Enhanced form type information for frontend display
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FormTypeInfo {
     pub code: String,
     pub name: String,
     pub description: String,
     pub category: String,
+    pub complexity: String,
+    pub typical_duration_minutes: u32,
 }
 
-/// Database statistics for monitoring
+/// Enhanced database statistics for monitoring and performance analysis
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DatabaseStats {
     pub total_forms: i64,
     pub draft_forms: i64,
     pub completed_forms: i64,
     pub final_forms: i64,
-    pub database_size_bytes: i64,
+    pub database_size_bytes: u64,
     pub last_backup: Option<String>,
+    pub connection_pool_stats: ConnectionPoolStats,
+    pub transaction_stats: TransactionStats,
 }
 
-/// Gets database statistics for monitoring and dashboard display.
+/// Connection pool statistics for monitoring
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ConnectionPoolStats {
+    pub size: u32,
+    pub idle: usize,
+    pub is_closed: bool,
+    pub max_connections: u32,
+}
+
+/// Transaction statistics for performance monitoring
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TransactionStats {
+    pub total_started: u64,
+    pub total_committed: u64,
+    pub total_rolled_back: u64,
+    pub success_rate: f64,
+    pub average_execution_time_ms: f64,
+}
+
+/// Gets comprehensive database statistics for monitoring and dashboard display.
+/// 
+/// Business Logic:
+/// - Provides detailed database performance metrics
+/// - Includes connection pool utilization
+/// - Shows transaction success rates and timing
+/// - Supports performance optimization decisions
 #[tauri::command]
 pub async fn get_database_stats(
     state: State<'_, AppState>
 ) -> Result<DatabaseStats, ErrorResponse> {
-    log::debug!("Fetching database statistics");
+    log::debug!("Fetching comprehensive database statistics");
 
     let db = state.lock().await;
-    let form_model = FormModel::new(db.pool().clone());
-
-    // Get form counts by status
-    let all_forms = form_model.search_forms(FormFilters::default()).await
-        .map_err(|e| ErrorResponse {
-            error: "Failed to fetch forms for statistics".to_string(),
-            details: Some(e.to_string()),
-        })?;
-
-    let mut draft_count = 0i64;
-    let mut completed_count = 0i64;
-    let mut final_count = 0i64;
-
-    for form in &all_forms.forms {
-        match form.status() {
-            Ok(FormStatus::Draft) => draft_count += 1,
-            Ok(FormStatus::Completed) => completed_count += 1,
-            Ok(FormStatus::Final) => final_count += 1,
-            Err(_) => {}, // Skip forms with invalid status
-        }
-    }
-
-    // For database size, we'll use a simple approximation
-    // In a production system, you might query the actual database file size
-    let database_size_bytes = all_forms.forms.len() as i64 * 1024; // Rough estimate
+    
+    // Get database statistics
+    let db_stats = db.get_stats().await?;
+    
+    // Get connection pool statistics
+    let pool_stats = db.get_pool_stats();
+    
+    // Get transaction statistics
+    let tx_stats = db.get_transaction_stats();
 
     let stats = DatabaseStats {
-        total_forms: all_forms.total_count,
-        draft_forms: draft_count,
-        completed_forms: completed_count,
-        final_forms: final_count,
-        database_size_bytes,
-        last_backup: None, // Could be implemented with actual backup tracking
+        total_forms: db_stats.total_forms,
+        draft_forms: db_stats.draft_forms,
+        completed_forms: db_stats.completed_forms,
+        final_forms: db_stats.final_forms,
+        database_size_bytes: db_stats.database_size_bytes,
+        last_backup: db_stats.last_backup.map(|dt| dt.to_rfc3339()),
+        connection_pool_stats: ConnectionPoolStats {
+            size: pool_stats.size,
+            idle: pool_stats.idle,
+            is_closed: pool_stats.is_closed,
+            max_connections: pool_stats.max_connections,
+        },
+        transaction_stats: TransactionStats {
+            total_started: tx_stats.total_started,
+            total_committed: tx_stats.total_committed,
+            total_rolled_back: tx_stats.total_rolled_back,
+            success_rate: tx_stats.success_rate,
+            average_execution_time_ms: tx_stats.average_execution_time_ms,
+        },
     };
 
-    log::debug!("Database stats: {} total forms", stats.total_forms);
+    log::debug!("Database stats: {} total forms, {}% transaction success rate", 
+               stats.total_forms, stats.transaction_stats.success_rate);
     Ok(stats)
 }

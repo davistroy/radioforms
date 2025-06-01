@@ -1,24 +1,32 @@
 /*!
- * Form model and business logic
+ * Form model and business logic - Enhanced with Enterprise CRUD Operations
  * 
  * This module contains the core business logic for ICS form management.
  * All form operations go through this module to ensure consistency
- * and proper validation.
+ * and proper validation. Enhanced to use the new enterprise-grade
+ * CRUD operations with transaction support.
  * 
  * Business Logic:
- * - CRUD operations for forms with proper validation
+ * - CRUD operations for forms with comprehensive validation
  * - Form lifecycle management (draft -> completed -> final)
- * - Search and filtering operations
- * - Data integrity and validation
+ * - Search and filtering operations with pagination
+ * - Data integrity and validation with optimistic locking
+ * - Enterprise-grade transaction support
  */
 
-use sqlx::SqlitePool;
 use anyhow::{Result, Context};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::database::Database;
 use crate::database::schema::{Form, FormStatus, ICSFormType};
+use crate::database::crud_operations::{
+    CreateFormRequest as CrudCreateRequest, 
+    UpdateFormRequest as CrudUpdateRequest,
+    FormSearchFilters as CrudSearchFilters,
+    FormSearchResult as CrudSearchResult
+};
 
 /// Form creation data transfer object.
 /// Used when creating new forms to specify initial values.
@@ -29,6 +37,10 @@ pub struct CreateFormRequest {
     pub incident_number: Option<String>,
     pub preparer_name: Option<String>,
     pub initial_data: Option<HashMap<String, serde_json::Value>>,
+    pub operational_period_start: Option<DateTime<Utc>>,
+    pub operational_period_end: Option<DateTime<Utc>>,
+    pub template_id: Option<i64>,
+    pub priority: Option<String>,
 }
 
 /// Form update data transfer object.
@@ -41,10 +53,15 @@ pub struct UpdateFormRequest {
     pub data: Option<HashMap<String, serde_json::Value>>,
     pub notes: Option<String>,
     pub preparer_name: Option<String>,
+    pub operational_period_start: Option<DateTime<Utc>>,
+    pub operational_period_end: Option<DateTime<Utc>>,
+    pub priority: Option<String>,
+    pub workflow_position: Option<String>,
+    pub expected_version: Option<i64>, // For optimistic locking
 }
 
 /// Form search filters.
-/// Supports filtering forms by multiple criteria.
+/// Supports filtering forms by multiple criteria with enhanced capabilities.
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct FormFilters {
     pub incident_name: Option<String>,
@@ -53,8 +70,13 @@ pub struct FormFilters {
     pub preparer_name: Option<String>,
     pub date_from: Option<DateTime<Utc>>,
     pub date_to: Option<DateTime<Utc>>,
+    pub priority: Option<String>,
+    pub workflow_position: Option<String>,
+    pub full_text_search: Option<String>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    pub order_by: Option<String>,
+    pub order_direction: Option<String>,
 }
 
 /// Form search results with pagination information.
@@ -62,334 +84,211 @@ pub struct FormFilters {
 pub struct FormSearchResult {
     pub forms: Vec<Form>,
     pub total_count: i64,
+    pub filtered_count: i64,
     pub has_more: bool,
+    pub search_time_ms: u64,
+    pub page: i64,
+    pub page_size: i64,
 }
 
-/// Form model with business logic operations.
+/// Enhanced Form model with enterprise-grade operations.
+/// 
+/// Business Logic:
+/// - Delegates all operations to enterprise CRUD operations
+/// - Provides simplified interface for common operations
+/// - Maintains backward compatibility with existing code
+/// - Adds comprehensive transaction support and error handling
 pub struct FormModel {
-    pool: SqlitePool,
+    database: Database,
 }
 
 impl FormModel {
-    /// Creates a new FormModel instance.
-    pub fn new(pool: SqlitePool) -> Self {
-        Self { pool }
-    }
-
-    /// Creates a new form with the specified data.
+    /// Creates a new FormModel instance with enhanced database operations.
     /// 
     /// Business Logic:
-    /// - Validates incident name is not empty
-    /// - Sets initial status to Draft
-    /// - Creates timestamps for creation and update
-    /// - Initializes form data with defaults if none provided
+    /// - Takes ownership of Database instance for enterprise operations
+    /// - Provides access to comprehensive CRUD operations
+    /// - Enables transaction support and optimistic locking
+    pub fn new(database: Database) -> Self {
+        Self { database }
+    }
+
+    /// Creates a new form with comprehensive validation and transaction support.
+    /// 
+    /// Business Logic:
+    /// - Uses enterprise CRUD operations for enhanced validation
+    /// - Provides transaction safety and rollback support
+    /// - Supports template-based form creation
+    /// - Includes operational period validation per ICS standards
     pub async fn create_form(&self, request: CreateFormRequest) -> Result<Form> {
-        // Validate required fields
-        if request.incident_name.trim().is_empty() {
-            return Err(anyhow::anyhow!("Incident name cannot be empty"));
-        }
+        // Convert to CRUD request format
+        let crud_request = CrudCreateRequest {
+            form_type: request.form_type,
+            incident_name: request.incident_name,
+            incident_number: request.incident_number,
+            preparer_name: request.preparer_name,
+            operational_period_start: request.operational_period_start,
+            operational_period_end: request.operational_period_end,
+            initial_data: request.initial_data,
+            template_id: request.template_id,
+            priority: request.priority,
+        };
 
-        // Prepare initial form data
-        let initial_data = request.initial_data.unwrap_or_else(|| {
-            let mut data = HashMap::new();
-            data.insert("incident_name".to_string(), 
-                       serde_json::Value::String(request.incident_name.clone()));
-            data.insert("form_type".to_string(), 
-                       serde_json::Value::String(request.form_type.to_string()));
-            data.insert("date_prepared".to_string(), 
-                       serde_json::Value::String(Utc::now().format("%Y-%m-%d").to_string()));
-            data.insert("time_prepared".to_string(), 
-                       serde_json::Value::String(Utc::now().format("%H:%M").to_string()));
-            if let Some(ref preparer) = request.preparer_name {
-                data.insert("preparer_name".to_string(), 
-                           serde_json::Value::String(preparer.clone()));
-            }
-            data
-        });
-
-        let data_json = serde_json::to_string(&initial_data)
-            .context("Failed to serialize initial form data")?;
-
-        // Insert form into database
-        let form_id = sqlx::query_scalar::<_, i64>(
-            r#"
-            INSERT INTO forms (form_type, incident_name, incident_number, status, data, preparer_name, created_at, updated_at)
-            VALUES (?1, ?2, ?3, 'draft', ?4, ?5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-            RETURNING id
-            "#
-        )
-        .bind(request.form_type.to_string())
-        .bind(&request.incident_name)
-        .bind(&request.incident_number)
-        .bind(&data_json)
-        .bind(&request.preparer_name)
-        .fetch_one(&self.pool)
-        .await
-        .context("Failed to create form in database")?;
-
-        // Fetch and return the created form
-        self.get_form_by_id(form_id).await?
-            .ok_or_else(|| anyhow::anyhow!("Failed to retrieve created form"))
-    }
-
-    /// Retrieves a form by its ID.
-    /// 
-    /// Business Logic:
-    /// - Returns None if form doesn't exist
-    /// - Performs ID validation
-    /// - Includes all form data and metadata
-    pub async fn get_form_by_id(&self, id: i64) -> Result<Option<Form>> {
-        if id <= 0 {
-            return Err(anyhow::anyhow!("Invalid form ID: {}", id));
-        }
-
-        let form = sqlx::query_as::<_, Form>(
-            "SELECT id, form_type, incident_name, incident_number, status, data, notes, preparer_name, created_at, updated_at FROM forms WHERE id = ?1"
-        )
-        .bind(id)
-        .fetch_optional(&self.pool)
-        .await
-        .context("Failed to fetch form from database")?;
-
-        Ok(form)
-    }
-
-    /// Updates an existing form with new data.
-    /// 
-    /// Business Logic:
-    /// - Validates form exists before updating
-    /// - Checks status transition validity
-    /// - Updates only provided fields
-    /// - Automatically updates updated_at timestamp
-    pub async fn update_form(&self, id: i64, request: UpdateFormRequest) -> Result<Form> {
-        // Get current form to validate updates
-        let current_form = self.get_form_by_id(id).await?
-            .ok_or_else(|| anyhow::anyhow!("Form not found with ID: {}", id))?;
-
-        // Validate status transition if requested
-        if let Some(new_status) = &request.status {
-            if !current_form.can_transition_to(new_status)? {
-                return Err(anyhow::anyhow!(
-                    "Invalid status transition from {:?} to {:?}", 
-                    current_form.status()?, new_status
-                ));
-            }
-        }
-
-        // Update fields individually (simpler and more reliable approach)
-        if let Some(incident_name) = &request.incident_name {
-            if incident_name.trim().is_empty() {
-                return Err(anyhow::anyhow!("Incident name cannot be empty"));
-            }
-            sqlx::query("UPDATE forms SET incident_name = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2")
-                .bind(incident_name)
-                .bind(id)
-                .execute(&self.pool)
-                .await
-                .context("Failed to update incident name")?;
-        }
-
-        if let Some(status) = &request.status {
-            sqlx::query("UPDATE forms SET status = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2")
-                .bind(status.to_string())
-                .bind(id)
-                .execute(&self.pool)
-                .await
-                .context("Failed to update status")?;
-        }
-
-        if let Some(data) = &request.data {
-            let data_json = serde_json::to_string(data)
-                .context("Failed to serialize form data")?;
-            sqlx::query("UPDATE forms SET data = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2")
-                .bind(data_json)
-                .bind(id)
-                .execute(&self.pool)
-                .await
-                .context("Failed to update form data")?;
-        }
-
-        // Fetch and return updated form
-        self.get_form_by_id(id).await?
-            .ok_or_else(|| anyhow::anyhow!("Failed to retrieve updated form"))
-    }
-
-    /// Deletes a form by ID.
-    /// 
-    /// Business Logic:
-    /// - Only allows deletion of draft forms by default
-    /// - Provides force option for final forms if needed
-    /// - Returns true if form was deleted, false if not found
-    pub async fn delete_form(&self, id: i64, force: bool) -> Result<bool> {
-        // Check if form exists and get its status
-        let form = self.get_form_by_id(id).await?;
+        // Execute through enterprise CRUD operations
+        let transaction_result = self.database.crud().create_form(crud_request).await?;
         
-        let form = match form {
-            Some(f) => f,
-            None => return Ok(false), // Form not found
-        };
-
-        // Check if deletion is allowed
-        if form.status()? == FormStatus::Final && !force {
-            return Err(anyhow::anyhow!(
-                "Cannot delete final form without force flag. Form ID: {}", id
-            ));
+        if transaction_result.success {
+            Ok(transaction_result.result)
+        } else {
+            Err(anyhow::anyhow!("Form creation failed"))
         }
-
-        let result = sqlx::query("DELETE FROM forms WHERE id = ?1")
-            .bind(id)
-            .execute(&self.pool)
-            .await
-            .context("Failed to delete form from database")?;
-
-        Ok(result.rows_affected() > 0)
     }
 
-    /// Searches forms based on the provided filters.
+    /// Retrieves a form by its ID with comprehensive error handling.
     /// 
     /// Business Logic:
-    /// - Supports partial text matching for incident names
-    /// - Date range filtering for created_at timestamps
-    /// - Pagination with limit and offset
-    /// - Returns total count for pagination UI
-    pub async fn search_forms(&self, filters: FormFilters) -> Result<FormSearchResult> {
-        let mut where_conditions = Vec::new();
-        let mut bind_values = Vec::new();
-        let mut param_count = 1;
+    /// - Uses enhanced CRUD operations for validation
+    /// - Provides detailed error messages for invalid IDs
+    /// - Returns None for non-existent forms
+    pub async fn get_form_by_id(&self, id: i64) -> Result<Option<Form>> {
+        self.database.crud().get_form_by_id(id).await
+    }
 
-        // Build WHERE conditions based on filters
-        if let Some(incident_name) = &filters.incident_name {
-            where_conditions.push(format!("incident_name LIKE ?{}", param_count));
-            bind_values.push(format!("%{}%", incident_name));
-            param_count += 1;
-        }
-
-        if let Some(form_type) = &filters.form_type {
-            where_conditions.push(format!("form_type = ?{}", param_count));
-            bind_values.push(form_type.to_string());
-            param_count += 1;
-        }
-
-        if let Some(status) = &filters.status {
-            where_conditions.push(format!("status = ?{}", param_count));
-            bind_values.push(status.to_string());
-            param_count += 1;
-        }
-
-        if let Some(preparer_name) = &filters.preparer_name {
-            where_conditions.push(format!("preparer_name LIKE ?{}", param_count));
-            bind_values.push(format!("%{}%", preparer_name));
-            param_count += 1;
-        }
-
-        if let Some(date_from) = &filters.date_from {
-            where_conditions.push(format!("created_at >= ?{}", param_count));
-            bind_values.push(date_from.to_rfc3339());
-            param_count += 1;
-        }
-
-        if let Some(date_to) = &filters.date_to {
-            where_conditions.push(format!("created_at <= ?{}", param_count));
-            bind_values.push(date_to.to_rfc3339());
-            param_count += 1;
-        }
-
-        let where_clause = if where_conditions.is_empty() {
-            String::new()
-        } else {
-            format!("WHERE {}", where_conditions.join(" AND "))
+    /// Updates an existing form with optimistic locking and validation.
+    /// 
+    /// Business Logic:
+    /// - Uses enterprise CRUD operations for comprehensive validation
+    /// - Supports optimistic locking to prevent conflicts
+    /// - Validates status transitions and business rules
+    /// - Provides transaction safety and audit trail
+    pub async fn update_form(&self, id: i64, request: UpdateFormRequest) -> Result<Form> {
+        // Convert to CRUD request format
+        let crud_request = CrudUpdateRequest {
+            incident_name: request.incident_name,
+            incident_number: request.incident_number,
+            status: request.status,
+            data: request.data,
+            notes: request.notes,
+            preparer_name: request.preparer_name,
+            operational_period_start: request.operational_period_start,
+            operational_period_end: request.operational_period_end,
+            priority: request.priority,
+            workflow_position: request.workflow_position,
+            expected_version: request.expected_version,
         };
 
-        // Get total count for pagination
-        let count_query = format!(
-            "SELECT COUNT(*) FROM forms {}",
-            where_clause
-        );
+        // Execute through enterprise CRUD operations
+        let transaction_result = self.database.crud().update_form(id, crud_request).await?;
+        
+        if transaction_result.success {
+            Ok(transaction_result.result)
+        } else {
+            Err(anyhow::anyhow!("Form update failed"))
+        }
+    }
 
-        // For now, simplified query without dynamic binding
-        let total_count: i64 = sqlx::query_scalar(&count_query)
-            .fetch_one(&self.pool)
-            .await
-            .context("Failed to count forms")?;
+    /// Deletes a form with proper validation and cascade handling.
+    /// 
+    /// Business Logic:
+    /// - Uses enterprise CRUD operations for validation
+    /// - Handles cascade deletion of related records
+    /// - Validates deletion permissions based on form status
+    /// - Provides force deletion option for administrative purposes
+    pub async fn delete_form(&self, id: i64, force: bool) -> Result<bool> {
+        let transaction_result = self.database.crud().delete_form(id, force).await?;
+        
+        if transaction_result.success {
+            Ok(transaction_result.result)
+        } else {
+            Ok(false)
+        }
+    }
 
-        // Get forms with pagination
-        let limit = filters.limit.unwrap_or(50);
-        let offset = filters.offset.unwrap_or(0);
+    /// Searches forms with comprehensive filtering and pagination.
+    /// 
+    /// Business Logic:
+    /// - Uses enterprise CRUD operations for optimized search
+    /// - Supports multiple filter criteria with efficient indexing
+    /// - Provides pagination for large result sets
+    /// - Includes search performance metrics
+    pub async fn search_forms(&self, filters: FormFilters) -> Result<FormSearchResult> {
+        // Convert to CRUD filters format
+        let crud_filters = CrudSearchFilters {
+            incident_name: filters.incident_name,
+            form_type: filters.form_type,
+            status: filters.status,
+            preparer_name: filters.preparer_name,
+            date_from: filters.date_from,
+            date_to: filters.date_to,
+            priority: filters.priority,
+            workflow_position: filters.workflow_position,
+            full_text_search: filters.full_text_search,
+            limit: filters.limit,
+            offset: filters.offset,
+            order_by: filters.order_by,
+            order_direction: filters.order_direction,
+        };
 
-        let forms_query = format!(
-            "SELECT id, form_type, incident_name, incident_number, status, data, notes, preparer_name, created_at, updated_at 
-             FROM forms {} 
-             ORDER BY updated_at DESC 
-             LIMIT {} OFFSET {}",
-            where_clause, limit, offset
-        );
-
-        let forms: Vec<Form> = sqlx::query_as::<_, Form>(&forms_query)
-            .fetch_all(&self.pool)
-            .await
-            .context("Failed to fetch forms")?;
-
-        let has_more = (offset + forms.len() as i64) < total_count;
-
+        // Execute search through enterprise CRUD operations
+        let crud_result = self.database.crud().search_forms(crud_filters).await?;
+        
+        // Convert to model result format
         Ok(FormSearchResult {
-            forms,
-            total_count,
-            has_more,
+            forms: crud_result.forms,
+            total_count: crud_result.total_count,
+            filtered_count: crud_result.filtered_count,
+            has_more: crud_result.has_more,
+            search_time_ms: crud_result.search_time_ms,
+            page: crud_result.page,
+            page_size: crud_result.page_size,
         })
     }
 
     /// Gets all forms for a specific incident.
     /// 
     /// Business Logic:
-    /// - Useful for viewing all forms related to an incident
+    /// - Uses enhanced search capabilities for incident filtering
+    /// - Returns all forms (all statuses) for the specified incident
     /// - Sorted by form type for logical ordering
-    /// - Includes all statuses (draft, completed, final)
     pub async fn get_forms_by_incident(&self, incident_name: &str) -> Result<Vec<Form>> {
-        let forms = sqlx::query_as::<_, Form>(
-            "SELECT id, form_type, incident_name, incident_number, status, data, notes, preparer_name, created_at, updated_at 
-             FROM forms 
-             WHERE incident_name = ?1 
-             ORDER BY form_type, created_at"
-        )
-        .bind(incident_name)
-        .fetch_all(&self.pool)
-        .await
-        .context("Failed to fetch forms by incident")?;
-
-        Ok(forms)
+        let filters = FormFilters {
+            incident_name: Some(incident_name.to_string()),
+            order_by: Some("form_type".to_string()),
+            order_direction: Some("ASC".to_string()),
+            ..Default::default()
+        };
+        
+        let result = self.search_forms(filters).await?;
+        Ok(result.forms)
     }
 
-    /// Gets recent forms (last 50 by update time).
+    /// Gets recent forms (most recently updated).
     /// 
     /// Business Logic:
-    /// - Useful for "recent forms" dashboard widget
-    /// - Shows most recently modified forms first
+    /// - Uses enhanced search capabilities with ordering
+    /// - Returns forms ordered by last update time (newest first)
     /// - Limited to reasonable number for performance
     pub async fn get_recent_forms(&self, limit: Option<i64>) -> Result<Vec<Form>> {
-        let limit = limit.unwrap_or(50);
-
-        let forms = sqlx::query_as::<_, Form>(
-            "SELECT id, form_type, incident_name, incident_number, status, data, notes, preparer_name, created_at, updated_at 
-             FROM forms 
-             ORDER BY updated_at DESC 
-             LIMIT ?1"
-        )
-        .bind(limit)
-        .fetch_all(&self.pool)
-        .await
-        .context("Failed to fetch recent forms")?;
-
-        Ok(forms)
+        let filters = FormFilters {
+            limit: Some(limit.unwrap_or(50)),
+            order_by: Some("updated_at".to_string()),
+            order_direction: Some("DESC".to_string()),
+            ..Default::default()
+        };
+        
+        let result = self.search_forms(filters).await?;
+        Ok(result.forms)
     }
 
     /// Duplicates an existing form as a new draft.
     /// 
     /// Business Logic:
-    /// - Creates a copy of an existing form
+    /// - Creates a copy of an existing form using existing operations
     /// - New form starts as Draft status
-    /// - Preserves all form data except timestamps and ID
-    /// - Useful for creating similar forms for the same incident
+    /// - Updates preparation date/time to current
+    /// - Optionally changes incident name
     pub async fn duplicate_form(&self, source_id: i64, new_incident_name: Option<String>) -> Result<Form> {
+        // Get the source form
         let source_form = self.get_form_by_id(source_id).await?
             .ok_or_else(|| anyhow::anyhow!("Source form not found with ID: {}", source_id))?;
 
@@ -402,19 +301,30 @@ impl FormModel {
         }
 
         // Update preparation date/time to current
+        let now = Utc::now();
         form_data.insert("date_prepared".to_string(), 
-                       serde_json::Value::String(Utc::now().format("%Y-%m-%d").to_string()));
+                       serde_json::Value::String(now.format("%Y-%m-%d").to_string()));
         form_data.insert("time_prepared".to_string(), 
-                       serde_json::Value::String(Utc::now().format("%H:%M").to_string()));
+                       serde_json::Value::String(now.format("%H:%M").to_string()));
 
         let create_request = CreateFormRequest {
             form_type: source_form.form_type()?,
             incident_name: new_incident_name.unwrap_or(source_form.incident_name),
             incident_number: source_form.incident_number,
             preparer_name: source_form.preparer_name,
+            operational_period_start: None, // Reset operational period
+            operational_period_end: None,
             initial_data: Some(form_data),
+            template_id: None,
+            priority: None,
         };
 
         self.create_form(create_request).await
     }
 }
+
+// Re-export for backward compatibility
+pub use CreateFormRequest as CreateFormRequestCompat;
+pub use UpdateFormRequest as UpdateFormRequestCompat;
+pub use FormFilters as FormFiltersCompat;
+pub use FormSearchResult as FormSearchResultCompat;
