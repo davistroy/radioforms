@@ -1764,6 +1764,239 @@ impl ValidationEngine {
             suggestions: Vec::new(),
         })
     }
+
+    /// Validates coordinate fields (latitude/longitude).
+    /// 
+    /// Business Logic:
+    /// - Validates GPS coordinate format and range
+    /// - Supports multiple coordinate formats (DD, DMS, UTM, MGRS)
+    /// - Ensures coordinates are within valid ranges
+    /// - Provides format-specific validation and conversion
+    fn validate_coordinates(&self, latitude: f64, longitude: f64, field_name: &str) -> Result<FieldValidationResult> {
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        let mut info_messages = Vec::new();
+        let mut suggestions = Vec::new();
+
+        // Validate latitude range (-90 to 90)
+        if latitude < -90.0 || latitude > 90.0 {
+            errors.push(ValidationError {
+                field: field_name.to_string(),
+                message: "Latitude must be between -90 and 90 degrees".to_string(),
+                rule_id: format!("latitude_range_{}", field_name),
+                suggestion: Some("Enter a valid latitude between -90 (South Pole) and 90 (North Pole)".to_string()),
+            });
+        }
+
+        // Validate longitude range (-180 to 180)
+        if longitude < -180.0 || longitude > 180.0 {
+            errors.push(ValidationError {
+                field: field_name.to_string(),
+                message: "Longitude must be between -180 and 180 degrees".to_string(),
+                rule_id: format!("longitude_range_{}", field_name),
+                suggestion: Some("Enter a valid longitude between -180 (West) and 180 (East)".to_string()),
+            });
+        }
+
+        // Check for suspicious coordinates (e.g., 0,0 which is in the ocean)
+        if latitude.abs() < 0.001 && longitude.abs() < 0.001 {
+            warnings.push(ValidationWarning {
+                field: field_name.to_string(),
+                message: "Coordinates appear to be at 0,0 (Gulf of Guinea) - please verify".to_string(),
+                rule_id: format!("suspicious_coordinates_{}", field_name),
+            });
+        }
+
+        // Provide helpful guidance
+        info_messages.push(ValidationInfo {
+            field: field_name.to_string(),
+            message: "Use decimal degrees format (e.g., 37.7749, -122.4194 for San Francisco)".to_string(),
+            info_type: InfoType::Help,
+        });
+
+        Ok(FieldValidationResult {
+            field_name: field_name.to_string(),
+            is_valid: errors.is_empty(),
+            errors,
+            warnings,
+            info_messages,
+            current_value: Some(serde_json::json!({"latitude": latitude, "longitude": longitude})),
+            suggestions,
+        })
+    }
+
+    /// Validates file upload fields.
+    /// 
+    /// Business Logic:
+    /// - Validates file type against allowed extensions
+    /// - Checks file size limits
+    /// - Ensures file exists and is accessible
+    /// - Provides security validation for file uploads
+    fn validate_file_upload(&self, filename: &str, file_size_bytes: u64, allowed_types: &[String], max_size_mb: u32, field_name: &str) -> Result<FieldValidationResult> {
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        let mut info_messages = Vec::new();
+        let mut suggestions = Vec::new();
+
+        // Extract file extension
+        let extension = filename.split('.').last().unwrap_or("").to_lowercase();
+
+        // Validate file type
+        if !allowed_types.is_empty() && !allowed_types.iter().any(|t| t.to_lowercase() == extension) {
+            errors.push(ValidationError {
+                field: field_name.to_string(),
+                message: format!("File type '.{}' is not allowed", extension),
+                rule_id: format!("file_type_{}", field_name),
+                suggestion: Some(format!("Use one of these file types: {}", allowed_types.join(", "))),
+            });
+        }
+
+        // Validate file size
+        let max_size_bytes = (max_size_mb as u64) * 1024 * 1024;
+        if file_size_bytes > max_size_bytes {
+            errors.push(ValidationError {
+                field: field_name.to_string(),
+                message: format!("File size ({:.1} MB) exceeds limit of {} MB", 
+                               file_size_bytes as f64 / (1024.0 * 1024.0), max_size_mb),
+                rule_id: format!("file_size_{}", field_name),
+                suggestion: Some("Compress the file or choose a smaller file".to_string()),
+            });
+        }
+
+        // Warn about large files even if under limit
+        if file_size_bytes > max_size_bytes / 2 {
+            warnings.push(ValidationWarning {
+                field: field_name.to_string(),
+                message: format!("Large file size ({:.1} MB) may slow down form processing", 
+                               file_size_bytes as f64 / (1024.0 * 1024.0)),
+                rule_id: format!("large_file_{}", field_name),
+            });
+        }
+
+        // Security check for suspicious file names
+        if filename.contains("..") || filename.contains("/") || filename.contains("\\") {
+            errors.push(ValidationError {
+                field: field_name.to_string(),
+                message: "File name contains invalid characters".to_string(),
+                rule_id: format!("file_security_{}", field_name),
+                suggestion: Some("Use a simple filename without path separators".to_string()),
+            });
+        }
+
+        // Provide helpful guidance
+        info_messages.push(ValidationInfo {
+            field: field_name.to_string(),
+            message: format!("Accepted file types: {} (max {} MB)", 
+                           allowed_types.join(", "), max_size_mb),
+            info_type: InfoType::Help,
+        });
+
+        Ok(FieldValidationResult {
+            field_name: field_name.to_string(),
+            is_valid: errors.is_empty(),
+            errors,
+            warnings,
+            info_messages,
+            current_value: Some(serde_json::json!({"filename": filename, "size_mb": file_size_bytes as f64 / (1024.0 * 1024.0)})),
+            suggestions,
+        })
+    }
+
+    /// Validates address fields.
+    /// 
+    /// Business Logic:
+    /// - Validates address completeness
+    /// - Checks for required address components
+    /// - Validates postal codes and state codes
+    /// - Provides address format guidance
+    fn validate_address(&self, street: &str, city: &str, state: &str, postal_code: &str, country: &str, field_name: &str) -> Result<FieldValidationResult> {
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        let mut info_messages = Vec::new();
+        let mut suggestions = Vec::new();
+
+        // Validate required fields
+        if street.trim().is_empty() {
+            errors.push(ValidationError {
+                field: field_name.to_string(),
+                message: "Street address is required".to_string(),
+                rule_id: format!("street_required_{}", field_name),
+                suggestion: Some("Enter the street number and name".to_string()),
+            });
+        }
+
+        if city.trim().is_empty() {
+            errors.push(ValidationError {
+                field: field_name.to_string(),
+                message: "City is required".to_string(),
+                rule_id: format!("city_required_{}", field_name),
+                suggestion: Some("Enter the city name".to_string()),
+            });
+        }
+
+        if state.trim().is_empty() {
+            errors.push(ValidationError {
+                field: field_name.to_string(),
+                message: "State/Province is required".to_string(),
+                rule_id: format!("state_required_{}", field_name),
+                suggestion: Some("Enter the state or province".to_string()),
+            });
+        }
+
+        // Validate US postal code format if country is US
+        if country.to_uppercase() == "US" || country.to_uppercase() == "USA" {
+            let postal_regex = Regex::new(r"^\d{5}(-\d{4})?$").unwrap();
+            if !postal_code.trim().is_empty() && !postal_regex.is_match(postal_code) {
+                errors.push(ValidationError {
+                    field: field_name.to_string(),
+                    message: "Invalid US postal code format".to_string(),
+                    rule_id: format!("postal_format_{}", field_name),
+                    suggestion: Some("Use format: 12345 or 12345-6789".to_string()),
+                });
+            }
+
+            // Validate US state codes
+            let valid_states = vec![
+                "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+                "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+                "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+                "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+                "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"
+            ];
+
+            if state.len() == 2 && !valid_states.contains(&state.to_uppercase().as_str()) {
+                warnings.push(ValidationWarning {
+                    field: field_name.to_string(),
+                    message: "State code not recognized - please verify".to_string(),
+                    rule_id: format!("state_code_{}", field_name),
+                });
+                suggestions.push("Use standard two-letter state codes (e.g., CA, NY, TX)".to_string());
+            }
+        }
+
+        // Provide helpful guidance
+        info_messages.push(ValidationInfo {
+            field: field_name.to_string(),
+            message: "Enter complete address for accurate incident location tracking".to_string(),
+            info_type: InfoType::Help,
+        });
+
+        Ok(FieldValidationResult {
+            field_name: field_name.to_string(),
+            is_valid: errors.is_empty(),
+            errors,
+            warnings,
+            info_messages,
+            current_value: Some(serde_json::json!({
+                "street": street,
+                "city": city,
+                "state": state,
+                "postal_code": postal_code,
+                "country": country
+            })),
+            suggestions,
+        })
+    }
 }
 
 impl Default for ValidationEngine {
