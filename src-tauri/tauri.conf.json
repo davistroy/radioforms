@@ -21,8 +21,7 @@
         "visible": true,
         "decorations": true,
         "alwaysOnTop": false,
-        "skipTaskbar": false,
-        "theme": "Auto"
+        "skipTaskbar": false
       }
     ],
     "security": {
@@ -42,7 +41,6 @@
   "bundle": {
     "active": true,
     "targets": ["nsis", "dmg", "appimage"],
-    "identifier": "com.radioforms.app",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -56,14 +54,6 @@
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
       "timestampUrl": ""
-    },
-    "nsis": {
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "languages": ["English"],
-      "installerIcon": "icons/icon.ico",
-      "license": null,
-      "template": null
     }
   }
 }
