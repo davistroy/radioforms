@@ -20,9 +20,9 @@
  * - Performance monitoring and optimization
  */
 
-use sqlx::{SqlitePool, Transaction, Sqlite, Acquire};
+use sqlx::{SqlitePool, Transaction, Sqlite, Executor};
 use anyhow::{Result, Context, anyhow};
-use chrono::{DateTime, Utc, Duration};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use std::sync::atomic::{AtomicU64, Ordering};

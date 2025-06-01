@@ -21,15 +21,15 @@
  * - Performance optimized for 2000+ forms
  */
 
-use sqlx::{SqlitePool, Transaction, Sqlite};
+use sqlx::{SqlitePool, Transaction, Sqlite, Executor};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Context};
 
-use crate::database::schema::{Form, FormStatus, ICSFormType, FormRelationship, FormStatusHistory, FormSignature, FormTemplate, ValidationRule, ExportConfiguration};
+use crate::database::schema::{Form, FormStatus, ICSFormType};
 use crate::database::transactions::{TransactionResult, TransactionManager};
-use crate::database::errors::{DatabaseError, DatabaseResult, ErrorContext};
+use crate::database::errors::{DatabaseError, DatabaseResult};
 
 /// Comprehensive CRUD operations manager for all database entities.
 /// 

@@ -308,7 +308,7 @@ impl FormModel {
                        serde_json::Value::String(now.format("%H:%M").to_string()));
 
         let create_request = CreateFormRequest {
-            form_type: source_form.form_type()?,
+            form_type: source_form.form_type.parse()?,
             incident_name: new_incident_name.unwrap_or(source_form.incident_name),
             incident_number: source_form.incident_number,
             preparer_name: source_form.preparer_name,

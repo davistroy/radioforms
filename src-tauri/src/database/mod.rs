@@ -25,12 +25,12 @@ use std::time::Duration;
 use anyhow::{Result, Context};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use crate::database::migration_runner::{MigrationRunner, MigrationRunnerFactory};
+use crate::database::migration_runner::{MigrationRunnerFactory};
 use crate::database::transactions::{TransactionManager, TransactionResult, TransactionStatsSnapshot};
 use crate::database::crud_operations::CrudOperations;
-use crate::database::errors::{DatabaseError, DatabaseResult, ErrorContext};
-use crate::database::integrity_checker::{IntegrityChecker, IntegrityCheckerFactory, IntegrityCheckResult};
-use crate::database::compaction::{DatabaseCompactor, DatabaseCompactorFactory, CompactionResult, CompactionConfig};
+// use crate::database::errors::{DatabaseError, DatabaseResult, ErrorContext};
+use crate::database::integrity_checker::{IntegrityCheckerFactory, IntegrityCheckResult};
+use crate::database::compaction::{DatabaseCompactorFactory, CompactionResult};
 
 pub mod schema;
 pub mod migrations;

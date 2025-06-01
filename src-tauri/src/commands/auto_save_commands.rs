@@ -20,7 +20,7 @@ use crate::services::auto_save::{AutoSaveService, AutoSaveStatus, AutoSaveConfig
 use crate::database::Database;
 
 /// Application state containing auto-save service
-pub type AutoSaveState = Arc<Mutex<Option<AutoSaveService>>>;
+pub type AutoSaveState = Arc<Mutex<Option<Arc<AutoSaveService>>>>;
 
 /// Error response structure for auto-save operations
 #[derive(Debug, Serialize, Deserialize)]
@@ -58,9 +58,9 @@ pub async fn start_auto_save(
     log::info!("Starting auto-save service");
     
     let database = Arc::clone(&*database_state);
-    let service = AutoSaveService::new(database)?;
+    let service = Arc::new(AutoSaveService::new(database)?);
     
-    service.start().await?;
+    Arc::clone(&service).start().await?;
     
     // Store service in application state
     {

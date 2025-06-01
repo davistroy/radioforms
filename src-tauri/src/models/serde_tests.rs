@@ -27,7 +27,7 @@ use std::collections::HashMap;
 
 use super::ics_types::*;
 use super::form_data::*;
-use super::validation::*;
+use super::validation::{ValidationEngine, FormValidationResult, FieldValidationResult, ValidationSummary, ValidationError, ValidationWarning, ValidationInfo, InfoType};
 use crate::database::schema::{Form, FormStatus, ICSFormType};
 
 /// Comprehensive serialization test suite for all ICS form types.
@@ -128,10 +128,8 @@ impl SerdeTestSuite {
             .context("Failed to deserialize ICS form footer")?;
 
         // Verify critical data
-        if let (Some(orig_prep), Some(deser_prep)) = (&footer.prepared_by, &deserialized.prepared_by) {
-            assert_eq!(orig_prep.name, deser_prep.name);
-            assert_eq!(orig_prep.position, deser_prep.position);
-        }
+        assert_eq!(footer.prepared_by.name, deserialized.prepared_by.name);
+        assert_eq!(footer.prepared_by.position_title, deserialized.prepared_by.position_title);
 
         println!("✅ ICS Form Footer serialization test passed");
         Ok(())

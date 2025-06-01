@@ -23,9 +23,30 @@ use crate::database::Database;
 use crate::models::form::{FormModel, CreateFormRequest, UpdateFormRequest, FormFilters, FormSearchResult};
 use crate::database::schema::{Form, ICSFormType, FormStatus};
 use crate::templates::loader::TemplateLoader;
+use crate::templates::schema::FieldValue;
 
 /// Application state containing database connection
 pub type AppState = Arc<Mutex<Database>>;
+
+/// Convert FieldValue to serde_json::Value for serialization
+fn field_value_to_json(value: &FieldValue) -> serde_json::Value {
+    match value {
+        FieldValue::String(s) => serde_json::Value::String(s.clone()),
+        FieldValue::Number(n) => serde_json::json!(n),
+        FieldValue::Boolean(b) => serde_json::Value::Bool(*b),
+        FieldValue::Array(arr) => {
+            let json_arr: Vec<serde_json::Value> = arr.iter().map(field_value_to_json).collect();
+            serde_json::Value::Array(json_arr)
+        },
+        FieldValue::Object(obj) => {
+            let json_obj: serde_json::Map<String, serde_json::Value> = obj.iter()
+                .map(|(k, v)| (k.clone(), field_value_to_json(v)))
+                .collect();
+            serde_json::Value::Object(json_obj)
+        },
+        FieldValue::Null => serde_json::Value::Null,
+    }
+}
 
 /// Error response structure for consistent error handling
 #[derive(Debug, Serialize, Deserialize)]
@@ -142,7 +163,7 @@ pub async fn create_form(
                     // Populate form data with template defaults
                     for (field_id, default_value) in &template.defaults {
                         if !enhanced_initial_data.contains_key(field_id) {
-                            enhanced_initial_data.insert(field_id.clone(), default_value.clone());
+                            enhanced_initial_data.insert(field_id.clone(), field_value_to_json(default_value));
                         }
                     }
                     
@@ -181,7 +202,7 @@ pub async fn create_form(
 
     let form = form_model.create_form(request).await?;
     
-    log::info!("Form created successfully: id={}, type={:?}", form.id, form.form_type());
+    log::info!("Form created successfully: id={}, type={:?}", form.id, form.form_type);
     Ok(form)
 }
 
@@ -339,7 +360,7 @@ pub async fn update_form(
 
     let form = form_model.update_form(id, updates).await?;
     
-    log::info!("Form updated successfully: id={}, status={:?}", form.id, form.status());
+    log::info!("Form updated successfully: id={}, status={:?}", form.id, form.status);
     Ok(form)
 }
 
@@ -823,10 +844,10 @@ pub async fn get_available_templates() -> Result<Vec<TemplateInfo>, ErrorRespons
                     title: template.title.clone(),
                     description: template.description.clone(),
                     version: template.version.clone(),
-                    created_at: template.metadata.created_at.clone(),
-                    updated_at: template.metadata.updated_at.clone(),
+                    created_at: template.metadata.created_at.to_string(),
+                    updated_at: template.metadata.updated_at.to_string(),
                     author: template.metadata.author.clone(),
-                    status: template.metadata.status.clone(),
+                    status: template.metadata.status.to_string(),
                     tags: template.metadata.tags.clone(),
                     sections_count: template.sections.len(),
                     fields_count: template_loader.get_template_stats().total_fields,
@@ -880,7 +901,9 @@ pub async fn get_template_details(
                     sections: template.sections.clone(),
                     validation_rules: template.validation_rules.clone(),
                     conditional_logic: template.conditional_logic.clone(),
-                    defaults: template.defaults.clone(),
+                    defaults: template.defaults.iter()
+                        .map(|(k, v)| (k.clone(), field_value_to_json(v)))
+                        .collect(),
                 };
                 
                 log::debug!("Retrieved template details for: {}", form_type);

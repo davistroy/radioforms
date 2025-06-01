@@ -153,7 +153,7 @@ impl AutoSaveService {
     }
     
     /// Starts the auto-save service with periodic timer
-    pub async fn start(&self) -> Result<()> {
+    pub async fn start(self: Arc<Self>) -> Result<()> {
         {
             let mut running = self.is_running.write().await;
             if *running {
@@ -170,8 +170,7 @@ impl AutoSaveService {
         }
         
         // Start the periodic save timer
-        let service = Arc::new(self);
-        let timer_service = Arc::clone(&service);
+        let timer_service = Arc::clone(&self);
         
         tokio::spawn(async move {
             timer_service.run_auto_save_loop().await;
@@ -222,7 +221,7 @@ impl AutoSaveService {
                 form_id,
                 data_hash,
                 last_modified: now,
-                form_data: data_string,
+                form_data: data_string.clone(),
                 version,
                 is_saved: false,
                 save_attempts: 0,

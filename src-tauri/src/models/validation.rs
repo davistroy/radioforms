@@ -24,14 +24,90 @@
  */
 
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc, NaiveDate, NaiveTime, Duration};
+use chrono::{DateTime, Utc, Datelike};
 use std::collections::HashMap;
 use anyhow::{Result, anyhow};
-// use regex::Regex; // TODO: Implement regex validation patterns
+use regex::Regex;
 
 use super::form_data::*;
 use super::ics_types::*;
-use crate::database::schema::{ValidationRule, ICSFormType, FormStatus};
+use crate::database::schema::ValidationRule;
+use crate::database::schema::FormStatus;
+
+/// Validation error details.
+/// 
+/// Business Logic:
+/// - Provides specific error information for failed validation
+/// - Includes suggestions for fixing the error
+/// - Enables field-specific error display in UI
+/// - Supports internationalization for error messages
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationError {
+    /// Field that failed validation
+    pub field: String,
+    
+    /// Human-readable error message
+    pub message: String,
+    
+    /// Rule ID that was violated
+    pub rule_id: String,
+    
+    /// Optional suggestion for fixing the error
+    pub suggestion: Option<String>,
+}
+
+/// Validation warning details.
+/// 
+/// Business Logic:
+/// - Provides non-critical validation feedback
+/// - Helps improve form quality without blocking submission
+/// - Enables progressive enhancement of form data
+/// - Supports best practice guidance
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationWarning {
+    /// Field that has a warning
+    pub field: String,
+    
+    /// Human-readable warning message
+    pub message: String,
+    
+    /// Rule ID that generated the warning
+    pub rule_id: String,
+}
+
+/// Validation info message types.
+/// 
+/// Business Logic:
+/// - Context: Provides situational information about the field
+/// - Help: Offers guidance on how to complete the field
+/// - Tip: Suggests best practices or shortcuts
+/// - Example: Shows valid examples for reference
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum InfoType {
+    Context,
+    Help,
+    Tip,
+    Example,
+}
+
+/// Validation informational message.
+/// 
+/// Business Logic:
+/// - Provides helpful guidance and context
+/// - Supports user education and best practices
+/// - Enables contextual help system
+/// - Improves user experience during form completion
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationInfo {
+    /// Field this information relates to
+    pub field: String,
+    
+    /// Informational message
+    pub message: String,
+    
+    /// Type of information being provided
+    pub info_type: InfoType,
+}
 
 /// Main validation engine for ICS forms.
 /// 
@@ -436,14 +512,12 @@ impl ValidationEngine {
     /// - Validates approval workflows
     fn validate_footer(&self, footer: &ICSFormFooter, result: &mut FormValidationResult) -> Result<()> {
         // Validate prepared by signature
-        if let Some(ref prepared_by) = footer.prepared_by {
-            let prepared_by_result = self.validate_signature(prepared_by, "prepared_by")?;
-            result.field_results.insert("prepared_by".to_string(), prepared_by_result);
-        }
+        let prepared_by_result = self.validate_prepared_by(&footer.prepared_by, "prepared_by")?;
+        result.field_results.insert("prepared_by".to_string(), prepared_by_result);
         
         // Validate approved by signature (if present)
         if let Some(ref approved_by) = footer.approved_by {
-            let approved_by_result = self.validate_signature(approved_by, "approved_by")?;
+            let approved_by_result = self.validate_approved_by(approved_by, "approved_by")?;
             result.field_results.insert("approved_by".to_string(), approved_by_result);
         }
         
@@ -494,16 +568,12 @@ impl ValidationEngine {
     /// - Validates relationship dependencies
     fn validate_lifecycle(&self, lifecycle: &FormLifecycle, result: &mut FormValidationResult) -> Result<()> {
         // Validate status transitions
-        let status_result = self.validate_status_transition(&lifecycle.status)?;
+        let status_result = self.validate_enhanced_status_transition(&lifecycle.status)?;
         result.field_results.insert("status".to_string(), status_result);
         
         // Validate workflow position
-        let workflow_result = self.validate_workflow_position(&lifecycle.workflow_position)?;
+        let workflow_result = self.validate_workflow_position_enum(&lifecycle.workflow_position)?;
         result.field_results.insert("workflow_position".to_string(), workflow_result);
-        
-        // Validate priority level
-        let priority_result = self.validate_priority(&lifecycle.priority)?;
-        result.field_results.insert("priority".to_string(), priority_result);
         
         Ok(())
     }
@@ -753,131 +823,6 @@ impl ValidationEngine {
     
     // Helper validation methods...
     
-    /// Validates incident name field.
-    fn validate_incident_name(&self, incident_name: &str) -> Result<FieldValidationResult> {
-        let mut errors = Vec::new();
-        let mut warnings = Vec::new();
-        let mut info_messages = Vec::new();
-        
-        // Required field check
-        if incident_name.trim().is_empty() {
-            errors.push(ValidationError {
-                field: "incident_name".to_string(),
-                message: "Incident name is required".to_string(),
-                rule_id: "required_incident_name".to_string(),
-                suggestion: Some("Enter a descriptive name for this incident".to_string()),
-            });
-        } else {
-            // Length validation
-            if incident_name.len() < 3 {
-                errors.push(ValidationError {
-                    field: "incident_name".to_string(),
-                    message: "Incident name must be at least 3 characters".to_string(),
-                    rule_id: "min_length_incident_name".to_string(),
-                    suggestion: Some("Use a more descriptive incident name".to_string()),
-                });
-            } else if incident_name.len() > 100 {
-                errors.push(ValidationError {
-                    field: "incident_name".to_string(),
-                    message: "Incident name must be 100 characters or less".to_string(),
-                    rule_id: "max_length_incident_name".to_string(),
-                    suggestion: Some("Shorten the incident name to 100 characters or less".to_string()),
-                });
-            }
-            
-            // Format validation
-            if incident_name.chars().all(|c| c.is_numeric()) {
-                warnings.push(ValidationWarning {
-                    field: "incident_name".to_string(),
-                    message: "Incident name should be descriptive, not just numbers".to_string(),
-                    rule_id: "descriptive_incident_name".to_string(),
-                });
-            }
-            
-            // Best practice guidance
-            if !incident_name.chars().any(|c| c.is_alphabetic()) {
-                info_messages.push(ValidationInfo {
-                    field: "incident_name".to_string(),
-                    message: "Consider including location or incident type in the name".to_string(),
-                    info_type: InfoType::Tip,
-                });
-            }
-        }
-        
-        Ok(FieldValidationResult {
-            field_name: "incident_name".to_string(),
-            is_valid: errors.is_empty(),
-            errors,
-            warnings,
-            info_messages,
-            current_value: Some(serde_json::json!(incident_name)),
-            suggestions: vec![
-                "Wildfire - Smith Creek".to_string(),
-                "Structure Fire - 123 Main St".to_string(),
-                "Traffic Accident - I-95 MM 45".to_string(),
-            ],
-        })
-    }
-    
-    /// Validates operational period date/time range.
-    fn validate_operational_period(&self, op_period: &DateTimeRange) -> Result<FieldValidationResult> {
-        let mut errors = Vec::new();
-        let mut warnings = Vec::new();
-        let mut info_messages = Vec::new();
-        
-        // Check that end time is after start time
-        if op_period.to <= op_period.from {
-            errors.push(ValidationError {
-                field: "operational_period".to_string(),
-                message: "Operational period end time must be after start time".to_string(),
-                rule_id: "valid_operational_period_range".to_string(),
-                suggestion: Some("Ensure the end time is later than the start time".to_string()),
-            });
-        } else {
-            // Check operational period duration
-            let duration = op_period.to.signed_duration_since(op_period.from);
-            let hours = duration.num_hours();
-            
-            if hours > 24 {
-                warnings.push(ValidationWarning {
-                    field: "operational_period".to_string(),
-                    message: "Operational periods longer than 24 hours should be justified".to_string(),
-                    rule_id: "long_operational_period".to_string(),
-                });
-            }
-            
-            if hours > 72 {
-                errors.push(ValidationError {
-                    field: "operational_period".to_string(),
-                    message: "Operational periods cannot exceed 72 hours per ICS standards".to_string(),
-                    rule_id: "max_operational_period".to_string(),
-                    suggestion: Some("Break long incidents into multiple operational periods".to_string()),
-                });
-            }
-            
-            // Provide guidance for typical operational periods
-            if hours <= 12 {
-                info_messages.push(ValidationInfo {
-                    field: "operational_period".to_string(),
-                    message: "Typical operational periods are 12-24 hours".to_string(),
-                    info_type: InfoType::Context,
-                });
-            }
-        }
-        
-        Ok(FieldValidationResult {
-            field_name: "operational_period".to_string(),
-            is_valid: errors.is_empty(),
-            errors,
-            warnings,
-            info_messages,
-            current_value: Some(serde_json::json!({
-                "start": op_period.from,
-                "end": op_period.to
-            })),
-            suggestions: Vec::new(),
-        })
-    }
     
     /// Validates required text field with length constraints.
     fn validate_required_text_field(
@@ -889,7 +834,7 @@ impl ValidationEngine {
         guidance: &str,
     ) -> Result<FieldValidationResult> {
         let mut errors = Vec::new();
-        let mut warnings = Vec::new();
+        let warnings = Vec::new();
         let mut info_messages = Vec::new();
         
         if text.trim().is_empty() {
@@ -993,19 +938,611 @@ impl ValidationEngine {
         })
     }
     
-    // Additional validation helper methods would continue here...
-    // This includes methods for validating person positions, signatures,
-    // radio channels, activity entries, etc.
+    /// Validates incident name field with ICS naming conventions.
+    /// 
+    /// Business Logic:
+    /// - Required field for all ICS forms
+    /// - Must be 3-100 characters
+    /// - Must follow ICS naming conventions
+    /// - Should avoid special characters that could cause issues
+    fn validate_incident_name(&self, incident_name: &str) -> Result<FieldValidationResult> {
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        let mut info_messages = Vec::new();
+        let mut suggestions = Vec::new();
+        
+        // Check if empty (required field)
+        if incident_name.trim().is_empty() {
+            errors.push(ValidationError {
+                field: "incident_name".to_string(),
+                message: "Incident name is required".to_string(),
+                rule_id: "required_incident_name".to_string(),
+                suggestion: Some("Enter a descriptive name for the incident".to_string()),
+            });
+            suggestions.extend(vec![
+                "Wildfire [Location] [Year]".to_string(),
+                "Structure Fire [Address]".to_string(),
+                "Search and Rescue [Location]".to_string(),
+                "Flood Response [Location]".to_string(),
+            ]);
+        } else {
+            // Check length constraints
+            if incident_name.len() < 3 {
+                errors.push(ValidationError {
+                    field: "incident_name".to_string(),
+                    message: "Incident name must be at least 3 characters".to_string(),
+                    rule_id: "min_length_incident_name".to_string(),
+                    suggestion: Some("Provide a more descriptive incident name".to_string()),
+                });
+            }
+            
+            if incident_name.len() > 100 {
+                errors.push(ValidationError {
+                    field: "incident_name".to_string(),
+                    message: "Incident name must be 100 characters or less".to_string(),
+                    rule_id: "max_length_incident_name".to_string(),
+                    suggestion: Some("Shorten the incident name while keeping it descriptive".to_string()),
+                });
+            }
+            
+            // Check for problematic characters
+            if incident_name.contains(['<', '>', '"', '\'', '&']) {
+                warnings.push(ValidationWarning {
+                    field: "incident_name".to_string(),
+                    message: "Incident name contains special characters that may cause issues in exports".to_string(),
+                    rule_id: "special_chars_incident_name".to_string(),
+                });
+            }
+            
+            // Check for ICS naming best practices
+            if !incident_name.chars().next().unwrap_or(' ').is_ascii_uppercase() {
+                warnings.push(ValidationWarning {
+                    field: "incident_name".to_string(),
+                    message: "Incident names typically start with a capital letter".to_string(),
+                    rule_id: "naming_convention_incident_name".to_string(),
+                });
+            }
+            
+            // Add helpful guidance
+            info_messages.push(ValidationInfo {
+                field: "incident_name".to_string(),
+                message: "Use a clear, descriptive name that includes incident type and location".to_string(),
+                info_type: InfoType::Help,
+            });
+        }
+        
+        Ok(FieldValidationResult {
+            field_name: "incident_name".to_string(),
+            is_valid: errors.is_empty(),
+            errors,
+            warnings,
+            info_messages,
+            current_value: Some(serde_json::json!(incident_name)),
+            suggestions,
+        })
+    }
+    
+    /// Validates incident number with standard format.
+    /// 
+    /// Business Logic:
+    /// - Optional field but recommended
+    /// - Must follow format: ST-YYYY-NNNNNN (e.g., CA-2024-000001)
+    /// - State code must be valid US state abbreviation
+    /// - Year should be current or recent year
+    fn validate_incident_number(&self, incident_number: &str) -> Result<FieldValidationResult> {
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        let mut info_messages = Vec::new();
+        let mut suggestions = Vec::new();
+        
+        if !incident_number.trim().is_empty() {
+            // Check format: XX-YYYY-NNNNNN
+            let pattern = regex::Regex::new(r"^[A-Z]{2}-\d{4}-\d{6}$").unwrap();
+            if !pattern.is_match(incident_number) {
+                errors.push(ValidationError {
+                    field: "incident_number".to_string(),
+                    message: "Incident number must follow format: ST-YYYY-NNNNNN (e.g., CA-2024-000001)".to_string(),
+                    rule_id: "format_incident_number".to_string(),
+                    suggestion: Some("Use two-letter state code, four-digit year, and six-digit number".to_string()),
+                });
+                suggestions.push("CA-2024-000001".to_string());
+            } else {
+                // Extract and validate components
+                let parts: Vec<&str> = incident_number.split('-').collect();
+                if parts.len() == 3 {
+                    let state_code = parts[0];
+                    let year_str = parts[1];
+                    
+                    // Validate state code
+                    let valid_states = vec![
+                        "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+                        "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+                        "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+                        "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+                        "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"
+                    ];
+                    
+                    if !valid_states.contains(&state_code) {
+                        warnings.push(ValidationWarning {
+                            field: "incident_number".to_string(),
+                            message: format!("'{}' may not be a valid US state code", state_code),
+                            rule_id: "state_code_incident_number".to_string(),
+                        });
+                    }
+                    
+                    // Validate year
+                    if let Ok(year) = year_str.parse::<i32>() {
+                        let current_year = chrono::Utc::now().year();
+                        if year < current_year - 5 || year > current_year + 1 {
+                            warnings.push(ValidationWarning {
+                                field: "incident_number".to_string(),
+                                message: format!("Year {} seems unusual for current incident", year),
+                                rule_id: "year_incident_number".to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Add helpful guidance
+        info_messages.push(ValidationInfo {
+            field: "incident_number".to_string(),
+            message: "Format: [State]-[Year]-[Number] (e.g., CA-2024-000001). Contact dispatch for official number.".to_string(),
+            info_type: InfoType::Help,
+        });
+        
+        Ok(FieldValidationResult {
+            field_name: "incident_number".to_string(),
+            is_valid: errors.is_empty(),
+            errors,
+            warnings,
+            info_messages,
+            current_value: Some(serde_json::json!(incident_number)),
+            suggestions,
+        })
+    }
+    
+    /// Validates operational period with date/time consistency.
+    /// 
+    /// Business Logic:
+    /// - Start time must be before end time
+    /// - Duration should not exceed 72 hours (ICS best practice)
+    /// - Times should be reasonable for incident operations
+    fn validate_operational_period(&self, op_period: &DateTimeRange) -> Result<FieldValidationResult> {
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        let mut info_messages = Vec::new();
+        
+        // Check that start is before end
+        if op_period.from >= op_period.to {
+            errors.push(ValidationError {
+                field: "operational_period".to_string(),
+                message: "Operational period start time must be before end time".to_string(),
+                rule_id: "period_order".to_string(),
+                suggestion: Some("Ensure the start date/time is earlier than the end date/time".to_string()),
+            });
+        } else {
+            let duration = op_period.to - op_period.from;
+            let duration_hours = duration.num_hours();
+            
+            // Check duration limits
+            if duration_hours > 72 {
+                warnings.push(ValidationWarning {
+                    field: "operational_period".to_string(),
+                    message: format!("Operational period of {} hours exceeds recommended 72-hour limit", duration_hours),
+                    rule_id: "period_duration".to_string(),
+                });
+            }
+            
+            if duration_hours < 1 {
+                warnings.push(ValidationWarning {
+                    field: "operational_period".to_string(),
+                    message: "Operational period is very short (less than 1 hour)".to_string(),
+                    rule_id: "period_too_short".to_string(),
+                });
+            }
+            
+            // Check for reasonable times
+            let now = chrono::Utc::now();
+            if op_period.to < now - chrono::Duration::days(30) {
+                warnings.push(ValidationWarning {
+                    field: "operational_period".to_string(),
+                    message: "Operational period end time is more than 30 days in the past".to_string(),
+                    rule_id: "period_old".to_string(),
+                });
+            }
+            
+            if op_period.from > now + chrono::Duration::days(7) {
+                warnings.push(ValidationWarning {
+                    field: "operational_period".to_string(),
+                    message: "Operational period start time is more than 7 days in the future".to_string(),
+                    rule_id: "period_future".to_string(),
+                });
+            }
+        }
+        
+        // Add helpful guidance
+        info_messages.push(ValidationInfo {
+            field: "operational_period".to_string(),
+            message: "Operational periods typically last 12-24 hours and should not exceed 72 hours".to_string(),
+            info_type: InfoType::Help,
+        });
+        
+        Ok(FieldValidationResult {
+            field_name: "operational_period".to_string(),
+            is_valid: errors.is_empty(),
+            errors,
+            warnings,
+            info_messages,
+            current_value: Some(serde_json::json!(format!("{} to {}", 
+                op_period.from.format("%Y-%m-%d %H:%M UTC"),
+                op_period.to.format("%Y-%m-%d %H:%M UTC")))),
+            suggestions: Vec::new(),
+        })
+    }
+    
+    /// Validates prepared date/time field.
+    /// 
+    /// Business Logic:
+    /// - Should be close to current time (within reasonable range)
+    /// - Should not be in the future beyond a few hours
+    /// - Should not be too far in the past
+    fn validate_prepared_datetime(&self, prepared_dt: &DateTime<Utc>) -> Result<FieldValidationResult> {
+        let errors = Vec::new();
+        let mut warnings = Vec::new();
+        let mut info_messages = Vec::new();
+        
+        let now = chrono::Utc::now();
+        let diff = *prepared_dt - now;
+        
+        // Check for future times
+        if diff.num_hours() > 2 {
+            warnings.push(ValidationWarning {
+                field: "prepared_date_time".to_string(),
+                message: "Prepared date/time is more than 2 hours in the future".to_string(),
+                rule_id: "prepared_future".to_string(),
+            });
+        }
+        
+        // Check for very old times
+        if diff.num_days() < -30 {
+            warnings.push(ValidationWarning {
+                field: "prepared_date_time".to_string(),
+                message: "Prepared date/time is more than 30 days old".to_string(),
+                rule_id: "prepared_old".to_string(),
+            });
+        }
+        
+        // Add helpful guidance
+        info_messages.push(ValidationInfo {
+            field: "prepared_date_time".to_string(),
+            message: "Date and time when this form was prepared or last updated".to_string(),
+            info_type: InfoType::Help,
+        });
+        
+        Ok(FieldValidationResult {
+            field_name: "prepared_date_time".to_string(),
+            is_valid: errors.is_empty(),
+            errors,
+            warnings,
+            info_messages,
+            current_value: Some(serde_json::json!(prepared_dt.format("%Y-%m-%d %H:%M:%S UTC").to_string())),
+            suggestions: Vec::new(),
+        })
+    }
+    
+    /// Validates email address format.
+    /// 
+    /// Business Logic:
+    /// - Must follow standard email format if provided
+    /// - Performs basic format validation
+    /// - Suggests corrections for common mistakes
+    fn validate_email_field(&self, email: &str, field_name: &str) -> Result<FieldValidationResult> {
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        let mut info_messages = Vec::new();
+        let mut suggestions = Vec::new();
+        
+        if !email.trim().is_empty() {
+            // Basic email validation regex
+            let email_pattern = regex::Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$").unwrap();
+            if !email_pattern.is_match(email) {
+                errors.push(ValidationError {
+                    field: field_name.to_string(),
+                    message: "Invalid email address format".to_string(),
+                    rule_id: format!("email_format_{}", field_name),
+                    suggestion: Some("Enter a valid email address (e.g., name@domain.com)".to_string()),
+                });
+                
+                // Suggest corrections for common mistakes
+                if !email.contains('@') {
+                    suggestions.push(format!("{}@example.com", email));
+                } else if !email.contains('.') {
+                    suggestions.push(format!("{}.com", email));
+                }
+            }
+            
+            // Check for common typos
+            if email.contains("..") {
+                warnings.push(ValidationWarning {
+                    field: field_name.to_string(),
+                    message: "Email contains consecutive dots which may be invalid".to_string(),
+                    rule_id: format!("email_dots_{}", field_name),
+                });
+            }
+        }
+        
+        // Add helpful guidance
+        info_messages.push(ValidationInfo {
+            field: field_name.to_string(),
+            message: "Enter a valid email address for contact purposes".to_string(),
+            info_type: InfoType::Help,
+        });
+        
+        Ok(FieldValidationResult {
+            field_name: field_name.to_string(),
+            is_valid: errors.is_empty(),
+            errors,
+            warnings,
+            info_messages,
+            current_value: Some(serde_json::json!(email)),
+            suggestions,
+        })
+    }
+    
+    /// Validates phone number format.
+    /// 
+    /// Business Logic:
+    /// - Accepts various phone number formats
+    /// - Validates US phone number patterns
+    /// - Suggests standard formatting
+    fn validate_phone_field(&self, phone: &str, field_name: &str) -> Result<FieldValidationResult> {
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        let mut info_messages = Vec::new();
+        let mut suggestions = Vec::new();
+        
+        if !phone.trim().is_empty() {
+            // Remove all non-digit characters for validation
+            let digits_only: String = phone.chars().filter(|c| c.is_ascii_digit()).collect();
+            
+            // Check basic length and format
+            if digits_only.len() < 10 {
+                errors.push(ValidationError {
+                    field: field_name.to_string(),
+                    message: "Phone number must have at least 10 digits".to_string(),
+                    rule_id: format!("phone_length_{}", field_name),
+                    suggestion: Some("Include area code and phone number (e.g., 555-123-4567)".to_string()),
+                });
+            } else if digits_only.len() > 11 {
+                warnings.push(ValidationWarning {
+                    field: field_name.to_string(),
+                    message: "Phone number has more than 11 digits, which may be invalid for US numbers".to_string(),
+                    rule_id: format!("phone_long_{}", field_name),
+                });
+            } else {
+                // Suggest standard formatting
+                if digits_only.len() == 10 {
+                    let formatted = format!("{}-{}-{}", 
+                                          &digits_only[0..3], 
+                                          &digits_only[3..6], 
+                                          &digits_only[6..10]);
+                    if phone != formatted {
+                        suggestions.push(formatted);
+                    }
+                } else if digits_only.len() == 11 && digits_only.starts_with('1') {
+                    let formatted = format!("1-{}-{}-{}", 
+                                          &digits_only[1..4], 
+                                          &digits_only[4..7], 
+                                          &digits_only[7..11]);
+                    if phone != formatted {
+                        suggestions.push(formatted);
+                    }
+                }
+            }
+        }
+        
+        // Add helpful guidance
+        info_messages.push(ValidationInfo {
+            field: field_name.to_string(),
+            message: "Include area code. Format: 555-123-4567 or (555) 123-4567".to_string(),
+            info_type: InfoType::Help,
+        });
+        
+        Ok(FieldValidationResult {
+            field_name: field_name.to_string(),
+            is_valid: errors.is_empty(),
+            errors,
+            warnings,
+            info_messages,
+            current_value: Some(serde_json::json!(phone)),
+            suggestions,
+        })
+    }
+    
+    /// Validates radio frequency with FCC regulations.
+    /// 
+    /// Business Logic:
+    /// - Must be within legal frequency ranges
+    /// - Should be in standard radio band allocations
+    /// - Validates frequency precision and format
+    fn validate_radio_frequency(&self, frequency: f64, field_name: &str) -> Result<FieldValidationResult> {
+        let errors = Vec::new();
+        let mut warnings = Vec::new();
+        let mut info_messages = Vec::new();
+        let mut suggestions = Vec::new();
+        
+        // Define common public safety frequency ranges (MHz)
+        let vhf_low = (30.0, 50.0);
+        let vhf_high = (138.0, 174.0);
+        let uhf_low = (380.0, 512.0);
+        let uhf_high = (700.0, 800.0);
+        let eight_hundred = (806.0, 824.0);
+        
+        let in_valid_range = frequency >= vhf_low.0 && frequency <= vhf_low.1 ||
+                            frequency >= vhf_high.0 && frequency <= vhf_high.1 ||
+                            frequency >= uhf_low.0 && frequency <= uhf_low.1 ||
+                            frequency >= uhf_high.0 && frequency <= uhf_high.1 ||
+                            frequency >= eight_hundred.0 && frequency <= eight_hundred.1;
+        
+        if !in_valid_range {
+            warnings.push(ValidationWarning {
+                field: field_name.to_string(),
+                message: format!("Frequency {:.3} MHz may not be in a standard public safety band", frequency),
+                rule_id: format!("frequency_range_{}", field_name),
+            });
+            
+            // Suggest common frequency ranges
+            suggestions.extend(vec![
+                "154.265".to_string(), // Common VHF fire frequency
+                "155.175".to_string(), // Common VHF EMS frequency
+                "460.125".to_string(), // Common UHF frequency
+            ]);
+        }
+        
+        // Check frequency precision
+        let precision = (frequency * 1000.0).fract();
+        if precision != 0.0 {
+            warnings.push(ValidationWarning {
+                field: field_name.to_string(),
+                message: "Frequency should typically be specified to 3 decimal places (kHz precision)".to_string(),
+                rule_id: format!("frequency_precision_{}", field_name),
+            });
+        }
+        
+        // Add helpful guidance
+        info_messages.push(ValidationInfo {
+            field: field_name.to_string(),
+            message: "Enter frequency in MHz (e.g., 154.265). Verify frequency assignment with communications unit.".to_string(),
+            info_type: InfoType::Help,
+        });
+        
+        Ok(FieldValidationResult {
+            field_name: field_name.to_string(),
+            is_valid: errors.is_empty(),
+            errors,
+            warnings,
+            info_messages,
+            current_value: Some(serde_json::json!(frequency)),
+            suggestions,
+        })
+    }
+    
+    /// Validates ICS position title against standard positions.
+    /// 
+    /// Business Logic:
+    /// - Should match standard ICS position titles
+    /// - Validates against ICS organizational structure
+    /// - Suggests correct position titles for typos
+    fn validate_ics_position(&self, position: &str, field_name: &str) -> Result<FieldValidationResult> {
+        let errors = Vec::new();
+        let mut warnings = Vec::new();
+        let mut info_messages = Vec::new();
+        let mut suggestions = Vec::new();
+        
+        if !position.trim().is_empty() {
+            // Standard ICS positions
+            let standard_positions = vec![
+                "Incident Commander",
+                "Deputy Incident Commander",
+                "Public Information Officer",
+                "Safety Officer",
+                "Liaison Officer",
+                "Operations Section Chief",
+                "Planning Section Chief",
+                "Logistics Section Chief",
+                "Finance/Administration Section Chief",
+                "Operations Branch Director",
+                "Planning Branch Director",
+                "Logistics Branch Director",
+                "Finance Branch Director",
+                "Division Supervisor",
+                "Group Supervisor",
+                "Task Force Leader",
+                "Strike Team Leader",
+                "Resources Unit Leader",
+                "Situation Unit Leader",
+                "Communications Unit Leader",
+                "Medical Unit Leader",
+                "Food Unit Leader",
+                "Supply Unit Leader",
+                "Facilities Unit Leader",
+                "Ground Support Unit Leader",
+                "Time Unit Leader",
+                "Procurement Unit Leader",
+                "Compensation/Claims Unit Leader",
+                "Cost Unit Leader",
+            ];
+            
+            // Check for exact match (case insensitive)
+            let position_lower = position.to_lowercase();
+            let exact_match = standard_positions.iter()
+                .find(|&p| p.to_lowercase() == position_lower);
+            
+            if exact_match.is_none() {
+                // Look for close matches
+                let close_matches: Vec<String> = standard_positions.iter()
+                    .filter(|&p| {
+                        let pos_lower = p.to_lowercase();
+                        pos_lower.contains(&position_lower) || 
+                        position_lower.contains(&pos_lower) ||
+                        levenshtein_distance(&position_lower, &pos_lower) <= 3
+                    })
+                    .map(|s| s.to_string())
+                    .collect();
+                
+                if !close_matches.is_empty() {
+                    warnings.push(ValidationWarning {
+                        field: field_name.to_string(),
+                        message: "Position title does not match standard ICS positions".to_string(),
+                        rule_id: format!("ics_position_{}", field_name),
+                    });
+                    suggestions.extend(close_matches);
+                } else {
+                    warnings.push(ValidationWarning {
+                        field: field_name.to_string(),
+                        message: "Position title does not match standard ICS positions".to_string(),
+                        rule_id: format!("ics_position_{}", field_name),
+                    });
+                    // Suggest common positions
+                    suggestions.extend(vec![
+                        "Incident Commander".to_string(),
+                        "Operations Section Chief".to_string(),
+                        "Planning Section Chief".to_string(),
+                        "Safety Officer".to_string(),
+                    ]);
+                }
+            }
+        }
+        
+        // Add helpful guidance
+        info_messages.push(ValidationInfo {
+            field: field_name.to_string(),
+            message: "Use standard ICS position titles. Refer to ICS organizational chart for correct titles.".to_string(),
+            info_type: InfoType::Help,
+        });
+        
+        Ok(FieldValidationResult {
+            field_name: field_name.to_string(),
+            is_valid: errors.is_empty(),
+            errors,
+            warnings,
+            info_messages,
+            current_value: Some(serde_json::json!(position)),
+            suggestions,
+        })
+    }
     
     /// Validates cross-field relationships.
-    fn validate_cross_fields(&self, form_data: &ICSFormData, result: &mut FormValidationResult) -> Result<()> {
+    fn validate_cross_fields(&self, _form_data: &ICSFormData, _result: &mut FormValidationResult) -> Result<()> {
         // This would implement cross-field validation logic
         // For now, return success to maintain compilation
         Ok(())
     }
     
     /// Validates business rules.
-    fn validate_business_rules(&self, form_data: &ICSFormData, result: &mut FormValidationResult) -> Result<()> {
+    fn validate_business_rules(&self, _form_data: &ICSFormData, _result: &mut FormValidationResult) -> Result<()> {
         // This would implement business rule validation logic
         // For now, return success to maintain compilation
         Ok(())
@@ -1066,30 +1603,7 @@ impl ValidationEngine {
             (current_avg * (total - 1.0) + validation_time_ms) / total;
     }
     
-    // Placeholder implementations for compilation
-    fn validate_incident_number(&self, _number: &str) -> Result<FieldValidationResult> {
-        Ok(FieldValidationResult {
-            field_name: "incident_number".to_string(),
-            is_valid: true,
-            errors: Vec::new(),
-            warnings: Vec::new(),
-            info_messages: Vec::new(),
-            current_value: None,
-            suggestions: Vec::new(),
-        })
-    }
-    
-    fn validate_prepared_datetime(&self, _datetime: &DateTime<Utc>) -> Result<FieldValidationResult> {
-        Ok(FieldValidationResult {
-            field_name: "prepared_date_time".to_string(),
-            is_valid: true,
-            errors: Vec::new(),
-            warnings: Vec::new(),
-            info_messages: Vec::new(),
-            current_value: None,
-            suggestions: Vec::new(),
-        })
-    }
+    // Additional helper validation methods for specific form elements
     
     fn validate_signature(&self, _signature: &PersonPosition, _context: &str) -> Result<FieldValidationResult> {
         Ok(FieldValidationResult {
@@ -1202,6 +1716,54 @@ impl ValidationEngine {
     fn validate_activity_chronology(&self, _entries: &[ActivityEntry], _result: &mut FormValidationResult) -> Result<()> {
         Ok(())
     }
+    
+    fn validate_prepared_by(&self, _prepared_by: &PreparedBy, _context: &str) -> Result<FieldValidationResult> {
+        Ok(FieldValidationResult {
+            field_name: _context.to_string(),
+            is_valid: true,
+            errors: Vec::new(),
+            warnings: Vec::new(),
+            info_messages: Vec::new(),
+            current_value: None,
+            suggestions: Vec::new(),
+        })
+    }
+    
+    fn validate_approved_by(&self, _approved_by: &ApprovedBy, _context: &str) -> Result<FieldValidationResult> {
+        Ok(FieldValidationResult {
+            field_name: _context.to_string(),
+            is_valid: true,
+            errors: Vec::new(),
+            warnings: Vec::new(),
+            info_messages: Vec::new(),
+            current_value: None,
+            suggestions: Vec::new(),
+        })
+    }
+    
+    fn validate_enhanced_status_transition(&self, _status: &EnhancedFormStatus) -> Result<FieldValidationResult> {
+        Ok(FieldValidationResult {
+            field_name: "status".to_string(),
+            is_valid: true,
+            errors: Vec::new(),
+            warnings: Vec::new(),
+            info_messages: Vec::new(),
+            current_value: None,
+            suggestions: Vec::new(),
+        })
+    }
+    
+    fn validate_workflow_position_enum(&self, _position: &WorkflowPosition) -> Result<FieldValidationResult> {
+        Ok(FieldValidationResult {
+            field_name: "workflow_position".to_string(),
+            is_valid: true,
+            errors: Vec::new(),
+            warnings: Vec::new(),
+            info_messages: Vec::new(),
+            current_value: None,
+            suggestions: Vec::new(),
+        })
+    }
 }
 
 impl Default for ValidationEngine {
@@ -1273,4 +1835,48 @@ impl ValidationEngineFactory {
             min_severity_level: SeverityLevel::Error, // Only critical issues
         })
     }
+}
+
+/// Helper function to calculate Levenshtein distance between two strings.
+/// 
+/// Used for suggesting similar field values and ICS position titles.
+fn levenshtein_distance(s1: &str, s2: &str) -> usize {
+    let len1 = s1.len();
+    let len2 = s2.len();
+    
+    if len1 == 0 {
+        return len2;
+    }
+    if len2 == 0 {
+        return len1;
+    }
+    
+    let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
+    
+    // Initialize first row and column
+    for i in 0..=len1 {
+        matrix[i][0] = i;
+    }
+    for j in 0..=len2 {
+        matrix[0][j] = j;
+    }
+    
+    let s1_chars: Vec<char> = s1.chars().collect();
+    let s2_chars: Vec<char> = s2.chars().collect();
+    
+    for i in 1..=len1 {
+        for j in 1..=len2 {
+            let cost = if s1_chars[i - 1] == s2_chars[j - 1] { 0 } else { 1 };
+            
+            matrix[i][j] = std::cmp::min(
+                std::cmp::min(
+                    matrix[i - 1][j] + 1,     // deletion
+                    matrix[i][j - 1] + 1      // insertion
+                ),
+                matrix[i - 1][j - 1] + cost   // substitution
+            );
+        }
+    }
+    
+    matrix[len1][len2]
 }

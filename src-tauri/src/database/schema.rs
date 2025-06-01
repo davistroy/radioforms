@@ -288,7 +288,7 @@ impl Form {
     /// - Draft -> Completed -> Final (no backwards transitions)
     /// - Validates required fields before status changes
     pub fn can_transition_to(&self, new_status: &FormStatus) -> anyhow::Result<bool> {
-        let current_status = self.status()?;
+        let current_status = self.get_status()?;
         match (&current_status, new_status) {
             // Can always stay in same status
             (current, new) if current == new => Ok(true),

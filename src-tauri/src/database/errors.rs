@@ -473,7 +473,7 @@ impl From<SqlxError> for DatabaseError {
     fn from(error: SqlxError) -> Self {
         match &error {
             SqlxError::Configuration(msg) => Self::Configuration {
-                message: msg.clone(),
+                message: msg.to_string(),
                 parameter: None,
                 expected_type: None,
                 occurred_at: Utc::now(),

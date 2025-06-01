@@ -519,3 +519,14 @@ pub enum TemplateStatus {
     Deprecated,
     Archived,
 }
+
+impl std::fmt::Display for TemplateStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TemplateStatus::Draft => write!(f, "draft"),
+            TemplateStatus::Published => write!(f, "published"),
+            TemplateStatus::Deprecated => write!(f, "deprecated"),
+            TemplateStatus::Archived => write!(f, "archived"),
+        }
+    }
+}
