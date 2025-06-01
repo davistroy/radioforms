@@ -46,6 +46,9 @@ pub struct TemplateLoader {
     
     /// Version manager for template compatibility checking
     version_manager: VersionManager,
+    
+    /// Help managers for each loaded template
+    help_managers: HashMap<String, HelpManager>,
 }
 
 impl TemplateLoader {
@@ -63,6 +66,7 @@ impl TemplateLoader {
             parser,
             config,
             version_manager: VersionManager::new(),
+            help_managers: HashMap::new(),
         };
         
         loader.load_all_embedded_templates()?;
@@ -144,6 +148,17 @@ impl TemplateLoader {
             }
         }
         
+        // Create help manager for the template
+        match HelpManager::from_template(&template) {
+            Ok(help_manager) => {
+                self.help_managers.insert(form_type.to_string(), help_manager);
+                debug!("Created help manager for template: {}", form_type);
+            },
+            Err(e) => {
+                warn!("Failed to create help manager for {}: {}", form_type, e);
+            }
+        }
+        
         self.templates.insert(form_type.to_string(), template);
         Ok(())
     }
@@ -202,6 +217,37 @@ impl TemplateLoader {
     /// Checks if running in embedded mode (release) or file system mode (debug).
     pub fn is_embedded_mode(&self) -> bool {
         !cfg!(debug_assertions)
+    }
+    
+    /// Gets help manager for a form type.
+    pub fn get_help_manager(&self, form_type: &str) -> Option<&HelpManager> {
+        self.help_managers.get(form_type)
+    }
+    
+    /// Gets field help for a specific field in a form.
+    pub fn get_field_help(&self, form_type: &str, field_id: &str) -> Option<&FieldHelp> {
+        self.help_managers.get(form_type)
+            .and_then(|manager| manager.get_field_help(field_id))
+    }
+    
+    /// Gets contextual help for a field.
+    pub fn get_contextual_help(&self, form_type: &str, field_id: &str, section_id: &str) -> Option<ContextualHelp> {
+        self.help_managers.get(form_type)
+            .map(|manager| manager.get_contextual_help(field_id, section_id))
+    }
+    
+    /// Gets validation messages for a field.
+    pub fn get_field_validation_messages(&self, form_type: &str, field_id: &str) -> Vec<ValidationMessage> {
+        self.help_managers.get(form_type)
+            .map(|manager| manager.get_field_validation_messages(field_id))
+            .unwrap_or_default()
+    }
+    
+    /// Gets help statistics for all loaded templates.
+    pub fn get_help_statistics(&self) -> HashMap<String, HelpStats> {
+        self.help_managers.iter()
+            .map(|(form_type, manager)| (form_type.clone(), manager.get_help_stats()))
+            .collect()
     }
     
     /// Gets template statistics.

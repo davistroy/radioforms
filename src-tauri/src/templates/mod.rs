@@ -25,6 +25,7 @@ pub mod loader;
 pub mod validator;
 pub mod version;
 pub mod resources;
+pub mod help;
 
 pub use schema::*;
 pub use parser::*;
@@ -32,6 +33,7 @@ pub use loader::*;
 pub use validator::*;
 pub use version::*;
 pub use resources::*;
+pub use help::*;
 
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
