@@ -33,6 +33,7 @@ pub mod templates;
 use database::Database;
 use commands::*;
 use services::auto_save::AutoSaveService;
+use models::validation::ValidationEngine;
 
 /// Application state type for sharing database connection
 pub type AppState = Arc<Mutex<Database>>;
@@ -81,6 +82,11 @@ pub fn run() {
                         // Initialize auto-save state
                         let auto_save_state: Arc<Mutex<Option<AutoSaveService>>> = Arc::new(Mutex::new(None));
                         app.manage(auto_save_state);
+                        
+                        // Initialize validation engine
+                        let validation_engine = ValidationEngine::new();
+                        let validation_state: Arc<Mutex<ValidationEngine>> = Arc::new(Mutex::new(validation_engine));
+                        app.manage(validation_state);
                     },
                     Err(e) => {
                         log::error!("Failed to initialize database: {}", e);
@@ -117,6 +123,12 @@ pub fn run() {
             get_pending_changes_count,
             force_save_all_changes,
             configure_auto_save,
+            
+            // Validation commands
+            validate_field,
+            validate_form,
+            get_validation_rules,
+            configure_validation,
             
             // Keep the original greet command for testing
             greet
