@@ -40,4 +40,5 @@ anyhow = "1.0"
 thiserror = "1.0"
 log = "0.4"
 env_logger = "0.11"
+regex = "1.0"
 

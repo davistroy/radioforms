@@ -26,6 +26,7 @@ use tauri::Manager;
 mod database;
 mod models;
 mod commands;
+mod utils;
 
 use database::Database;
 use commands::*;

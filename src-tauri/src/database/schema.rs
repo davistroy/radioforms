@@ -359,3 +359,367 @@ impl Setting {
         Ok(())
     }
 }
+
+// ============================================================================
+// Enhanced Schema Structures (Migration 002)
+// ============================================================================
+
+/// Form relationship record for tracking dependencies between forms.
+/// 
+/// Business Logic:
+/// - Tracks how forms relate to each other in ICS workflows
+/// - Supports automatic form updates when related data changes
+/// - Enables Incident Action Plan assembly and validation
+/// - Provides foundation for workflow automation
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct FormRelationship {
+    /// Unique identifier for the relationship
+    pub id: i64,
+    
+    /// Source form ID
+    pub source_form_id: i64,
+    
+    /// Target form ID that is related
+    pub target_form_id: i64,
+    
+    /// Type of relationship (feeds, requires, updates, etc.)
+    pub relationship_type: String,
+    
+    /// How critical this dependency is (required, recommended, optional)
+    pub dependency_strength: String,
+    
+    /// When the relationship was created
+    pub created_at: DateTime<Utc>,
+    
+    /// Optional notes about the relationship
+    pub notes: Option<String>,
+}
+
+/// Form status history record for audit trail.
+/// 
+/// Business Logic:
+/// - Documents all status changes for accountability
+/// - Supports workflow analysis and optimization
+/// - Provides audit trail for compliance requirements
+/// - Enables troubleshooting of form processing issues
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct FormStatusHistory {
+    /// Unique identifier for the status change
+    pub id: i64,
+    
+    /// Form that had its status changed
+    pub form_id: i64,
+    
+    /// Previous status (if any)
+    pub from_status: Option<String>,
+    
+    /// New status
+    pub to_status: String,
+    
+    /// Who made the status change
+    pub changed_by: String,
+    
+    /// When the change occurred
+    pub changed_at: DateTime<Utc>,
+    
+    /// Reason for the change (optional)
+    pub reason: Option<String>,
+    
+    /// Workflow position at time of change
+    pub workflow_position: Option<String>,
+}
+
+/// Digital signature record for form authentication.
+/// 
+/// Business Logic:
+/// - Supports various signature types for different deployment scenarios
+/// - Provides non-repudiation for critical forms
+/// - Enables digital signature workflows
+/// - Maintains audit trail for signature verification
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct FormSignature {
+    /// Unique identifier for the signature
+    pub id: i64,
+    
+    /// Form that was signed
+    pub form_id: i64,
+    
+    /// Type of signature (digital, electronic, handwritten)
+    pub signature_type: String,
+    
+    /// Name of the person who signed
+    pub signer_name: String,
+    
+    /// Position/title of the signer
+    pub signer_position: Option<String>,
+    
+    /// Actual signature data (varies by type)
+    pub signature_data: Option<Vec<u8>>,
+    
+    /// When the signature was applied
+    pub signature_timestamp: DateTime<Utc>,
+    
+    /// Context of the signature (prepared_by, approved_by, etc.)
+    pub signature_context: Option<String>,
+    
+    /// Verification status of the signature
+    pub verification_status: String,
+}
+
+/// Form template record for dynamic form generation.
+/// 
+/// Business Logic:
+/// - Defines structure and validation rules for each form type
+/// - Enables dynamic form rendering in the UI
+/// - Supports form template versioning and updates
+/// - Provides foundation for form validation engine
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct FormTemplate {
+    /// Unique identifier for the template
+    pub id: i64,
+    
+    /// ICS form type this template defines
+    pub form_type: String,
+    
+    /// Version of the template
+    pub template_version: String,
+    
+    /// JSON structure defining form fields and layout
+    pub template_data: String,
+    
+    /// JSON array of validation rules for this form type
+    pub validation_rules: Option<String>,
+    
+    /// When the template was created
+    pub created_at: DateTime<Utc>,
+    
+    /// When the template was last updated
+    pub updated_at: DateTime<Utc>,
+    
+    /// Whether this template is currently active
+    pub is_active: bool,
+}
+
+impl FormTemplate {
+    /// Parses the template data into a structured format.
+    /// 
+    /// Business Logic:
+    /// - Provides type-safe access to template structure
+    /// - Handles JSON parsing errors gracefully
+    /// - Returns HashMap for flexible field access
+    pub fn parse_template_data(&self) -> anyhow::Result<HashMap<String, serde_json::Value>> {
+        serde_json::from_str(&self.template_data)
+            .map_err(|e| anyhow::anyhow!("Failed to parse template data: {}", e))
+    }
+    
+    /// Parses the validation rules into a structured format.
+    /// 
+    /// Business Logic:
+    /// - Provides access to form-specific validation rules
+    /// - Returns empty vector if no rules are defined
+    /// - Handles JSON parsing errors gracefully
+    pub fn parse_validation_rules(&self) -> anyhow::Result<Vec<String>> {
+        match &self.validation_rules {
+            Some(rules) => serde_json::from_str(rules)
+                .map_err(|e| anyhow::anyhow!("Failed to parse validation rules: {}", e)),
+            None => Ok(Vec::new()),
+        }
+    }
+}
+
+/// Validation rule record for reusable validation logic.
+/// 
+/// Business Logic:
+/// - Defines reusable validation rules across form types
+/// - Supports complex validation scenarios and business rules
+/// - Enables consistent validation behavior across the application
+/// - Provides foundation for real-time validation feedback
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ValidationRule {
+    /// Unique identifier for the validation rule
+    pub id: i64,
+    
+    /// Unique rule identifier for referencing
+    pub rule_id: String,
+    
+    /// Human-readable name for the rule
+    pub rule_name: String,
+    
+    /// Type of validation (required, format, range, etc.)
+    pub rule_type: String,
+    
+    /// JSON array of form types this rule applies to (null = all)
+    pub form_types: Option<String>,
+    
+    /// JSON array of field names this rule validates
+    pub fields: String,
+    
+    /// JSON object defining the validation logic
+    pub validation_logic: String,
+    
+    /// Error message to display when validation fails
+    pub error_message: String,
+    
+    /// Warning message for non-critical validation issues
+    pub warning_message: Option<String>,
+    
+    /// Severity level (error, warning, info)
+    pub severity: String,
+    
+    /// Whether this rule is currently active
+    pub is_active: bool,
+    
+    /// When the rule was created
+    pub created_at: DateTime<Utc>,
+    
+    /// When the rule was last updated
+    pub updated_at: DateTime<Utc>,
+}
+
+impl ValidationRule {
+    /// Parses the form types into a list.
+    /// 
+    /// Business Logic:
+    /// - Returns list of form types this rule applies to
+    /// - Returns None if rule applies to all forms
+    /// - Handles JSON parsing errors gracefully
+    pub fn parse_form_types(&self) -> anyhow::Result<Option<Vec<String>>> {
+        match &self.form_types {
+            Some(types) => {
+                let parsed: Vec<String> = serde_json::from_str(types)
+                    .map_err(|e| anyhow::anyhow!("Failed to parse form types: {}", e))?;
+                Ok(Some(parsed))
+            },
+            None => Ok(None),
+        }
+    }
+    
+    /// Parses the fields into a list.
+    /// 
+    /// Business Logic:
+    /// - Returns list of field names this rule validates
+    /// - Handles JSON parsing errors gracefully
+    /// - Always returns a vector (empty if parsing fails)
+    pub fn parse_fields(&self) -> anyhow::Result<Vec<String>> {
+        serde_json::from_str(&self.fields)
+            .map_err(|e| anyhow::anyhow!("Failed to parse fields: {}", e))
+    }
+    
+    /// Parses the validation logic into a structured format.
+    /// 
+    /// Business Logic:
+    /// - Provides access to the validation logic configuration
+    /// - Returns HashMap for flexible access to logic parameters
+    /// - Handles JSON parsing errors gracefully
+    pub fn parse_validation_logic(&self) -> anyhow::Result<HashMap<String, serde_json::Value>> {
+        serde_json::from_str(&self.validation_logic)
+            .map_err(|e| anyhow::anyhow!("Failed to parse validation logic: {}", e))
+    }
+}
+
+/// Export configuration record for customizing output formats.
+/// 
+/// Business Logic:
+/// - Stores configuration for different export formats
+/// - Enables customization of PDF, JSON, ICS-DES, and other exports
+/// - Supports user-defined export templates and filters
+/// - Provides foundation for flexible export system
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ExportConfiguration {
+    /// Unique identifier for the configuration
+    pub id: i64,
+    
+    /// Human-readable name for the configuration
+    pub config_name: String,
+    
+    /// Export format (pdf, json, ics_des, csv, xml)
+    pub export_format: String,
+    
+    /// JSON array of applicable form types (null = all)
+    pub form_types: Option<String>,
+    
+    /// JSON configuration specific to the export format
+    pub template_data: Option<String>,
+    
+    /// JSON array of field filters for selective export
+    pub field_filters: Option<String>,
+    
+    /// JSON configuration specific to ICS-DES format
+    pub ics_des_config: Option<String>,
+    
+    /// Who created this configuration
+    pub created_by: Option<String>,
+    
+    /// When the configuration was created
+    pub created_at: DateTime<Utc>,
+    
+    /// When the configuration was last updated
+    pub updated_at: DateTime<Utc>,
+    
+    /// Whether this is the default configuration for the format
+    pub is_default: bool,
+}
+
+impl ExportConfiguration {
+    /// Parses the applicable form types.
+    /// 
+    /// Business Logic:
+    /// - Returns list of form types this configuration applies to
+    /// - Returns None if configuration applies to all forms
+    /// - Handles JSON parsing errors gracefully
+    pub fn parse_form_types(&self) -> anyhow::Result<Option<Vec<String>>> {
+        match &self.form_types {
+            Some(types) => {
+                let parsed: Vec<String> = serde_json::from_str(types)
+                    .map_err(|e| anyhow::anyhow!("Failed to parse form types: {}", e))?;
+                Ok(Some(parsed))
+            },
+            None => Ok(None),
+        }
+    }
+    
+    /// Parses the template data configuration.
+    /// 
+    /// Business Logic:
+    /// - Provides access to format-specific configuration
+    /// - Returns empty HashMap if no template data is defined
+    /// - Handles JSON parsing errors gracefully
+    pub fn parse_template_data(&self) -> anyhow::Result<HashMap<String, serde_json::Value>> {
+        match &self.template_data {
+            Some(data) => serde_json::from_str(data)
+                .map_err(|e| anyhow::anyhow!("Failed to parse template data: {}", e)),
+            None => Ok(HashMap::new()),
+        }
+    }
+    
+    /// Parses the field filters configuration.
+    /// 
+    /// Business Logic:
+    /// - Provides access to field filtering rules
+    /// - Returns empty vector if no filters are defined
+    /// - Handles JSON parsing errors gracefully
+    pub fn parse_field_filters(&self) -> anyhow::Result<Vec<HashMap<String, serde_json::Value>>> {
+        match &self.field_filters {
+            Some(filters) => serde_json::from_str(filters)
+                .map_err(|e| anyhow::anyhow!("Failed to parse field filters: {}", e)),
+            None => Ok(Vec::new()),
+        }
+    }
+    
+    /// Parses the ICS-DES specific configuration.
+    /// 
+    /// Business Logic:
+    /// - Provides access to ICS-DES format parameters
+    /// - Returns None if no ICS-DES configuration is defined
+    /// - Handles JSON parsing errors gracefully
+    pub fn parse_ics_des_config(&self) -> anyhow::Result<Option<HashMap<String, serde_json::Value>>> {
+        match &self.ics_des_config {
+            Some(config) => {
+                let parsed: HashMap<String, serde_json::Value> = serde_json::from_str(config)
+                    .map_err(|e| anyhow::anyhow!("Failed to parse ICS-DES config: {}", e))?;
+                Ok(Some(parsed))
+            },
+            None => Ok(None),
+        }
+    }
+}
