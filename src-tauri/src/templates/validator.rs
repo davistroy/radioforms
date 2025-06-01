@@ -298,7 +298,7 @@ impl TemplateValidator {
                 }
             },
             
-            (FieldType::Select { options, multiple }, value) => {
+            (FieldType::Select { options, multiple, .. }, value) => {
                 if *multiple {
                     if let FieldValue::Array(values) = value {
                         for val in values {

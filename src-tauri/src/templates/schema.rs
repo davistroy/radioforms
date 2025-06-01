@@ -355,7 +355,7 @@ pub enum CoordinateFormat {
 
 /// Frequency unit enumeration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "uppercase")]
+#[serde(rename_all = "UPPERCASE")]
 pub enum FrequencyUnit {
     Hz,
     Khz,

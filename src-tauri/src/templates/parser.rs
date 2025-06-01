@@ -436,7 +436,7 @@ impl TemplateParser {
         let mut all_field_ids = HashSet::new();
         let mut all_section_ids = HashSet::new();
         
-        self.collect_field_and_section_ids(template, &mut all_field_ids, &all_section_ids);
+        self.collect_field_and_section_ids(template, &mut all_field_ids, &mut all_section_ids);
         
         // Validate validation rule target fields
         for rule in &template.validation_rules {

@@ -1,0 +1,511 @@
+{
+  "template_id": "ics-201-v1",
+  "form_type": "ICS-201",
+  "version": "1.0",
+  "title": "Incident Briefing",
+  "description": "ICS-201 provides the Incident Commander (and all responding agencies) with basic incident information including incident participants, objectives, and main strategies.",
+  "metadata": {
+    "created_at": "2025-01-01T00:00:00Z",
+    "updated_at": "2025-01-01T00:00:00Z",
+    "author": "FEMA ICS Working Group",
+    "compatibility_version": "1.0",
+    "min_app_version": "1.0.0",
+    "tags": ["incident", "briefing", "command"],
+    "status": "published",
+    "custom_metadata": {
+      "fema_form_version": "October 2017",
+      "official_source": "https://training.fema.gov/emiweb/is/icsresource/trainingmaterials/"
+    }
+  },
+  "sections": [
+    {
+      "section_id": "incident_header",
+      "title": "Incident Information",
+      "description": "Basic incident identification and operational period information",
+      "order": 1,
+      "required": true,
+      "repeatable": false,
+      "max_repetitions": null,
+      "fields": [
+        {
+          "field_id": "incident_name",
+          "label": "Incident Name",
+          "field_type": {
+            "type": "text",
+            "max_length": 100,
+            "min_length": 1
+          },
+          "required": true,
+          "default_value": null,
+          "placeholder": "Enter the incident name",
+          "help_text": "The name assigned to the incident. Should be descriptive and unique.",
+          "validation_rules": [
+            {
+              "rule_id": "incident_name_required",
+              "rule_type": {
+                "type": "required"
+              },
+              "error_message": "Incident name is required",
+              "warning_message": null,
+              "target_fields": ["incident_name"],
+              "condition": null
+            }
+          ],
+          "conditional_display": null,
+          "order": 1,
+          "readonly": false,
+          "css_classes": ["incident-name"],
+          "attributes": {}
+        },
+        {
+          "field_id": "incident_number",
+          "label": "Incident Number",
+          "field_type": {
+            "type": "text",
+            "max_length": 50,
+            "pattern": "^[A-Z]{2}-\\d{4}-\\d{6}$"
+          },
+          "required": false,
+          "default_value": null,
+          "placeholder": "CA-2025-123456",
+          "help_text": "Official incident number assigned by the agency (format: SS-YYYY-NNNNNN)",
+          "validation_rules": [
+            {
+              "rule_id": "incident_number_pattern",
+              "rule_type": {
+                "type": "pattern",
+                "regex": "^[A-Z]{2}-\\d{4}-\\d{6}$"
+              },
+              "error_message": "Incident number must follow format SS-YYYY-NNNNNN (e.g., CA-2025-123456)",
+              "warning_message": null,
+              "target_fields": ["incident_number"],
+              "condition": null
+            }
+          ],
+          "conditional_display": null,
+          "order": 2,
+          "readonly": false,
+          "css_classes": ["incident-number"],
+          "attributes": {}
+        },
+        {
+          "field_id": "operational_period",
+          "label": "Operational Period",
+          "field_type": {
+            "type": "text",
+            "max_length": 100
+          },
+          "required": true,
+          "default_value": null,
+          "placeholder": "Date/Time From - To",
+          "help_text": "Time period this briefing covers (e.g., 01/01/2025 0600 - 01/01/2025 1800)",
+          "validation_rules": [
+            {
+              "rule_id": "operational_period_required",
+              "rule_type": {
+                "type": "required"
+              },
+              "error_message": "Operational period is required",
+              "warning_message": null,
+              "target_fields": ["operational_period"],
+              "condition": null
+            }
+          ],
+          "conditional_display": null,
+          "order": 3,
+          "readonly": false,
+          "css_classes": ["operational-period"],
+          "attributes": {}
+        }
+      ],
+      "subsections": [],
+      "validation_rules": [],
+      "conditional_display": null
+    },
+    {
+      "section_id": "map_sketch",
+      "title": "Map/Sketch",
+      "description": "Visual representation of the incident area",
+      "order": 2,
+      "required": false,
+      "repeatable": false,
+      "max_repetitions": null,
+      "fields": [
+        {
+          "field_id": "map_attachment",
+          "label": "Map/Sketch Attachment",
+          "field_type": {
+            "type": "file",
+            "allowed_types": ["image/png", "image/jpeg", "image/gif", "application/pdf"],
+            "max_size_mb": 10,
+            "multiple": false
+          },
+          "required": false,
+          "default_value": null,
+          "placeholder": null,
+          "help_text": "Attach a map or sketch showing the incident area, resources, and key features",
+          "validation_rules": [],
+          "conditional_display": null,
+          "order": 1,
+          "readonly": false,
+          "css_classes": ["map-attachment"],
+          "attributes": {}
+        },
+        {
+          "field_id": "north_arrow",
+          "label": "North Arrow Indicated",
+          "field_type": {
+            "type": "boolean_checkbox",
+            "default_checked": false
+          },
+          "required": false,
+          "default_value": false,
+          "placeholder": null,
+          "help_text": "Check if the north arrow is clearly indicated on the map/sketch",
+          "validation_rules": [],
+          "conditional_display": null,
+          "order": 2,
+          "readonly": false,
+          "css_classes": ["north-arrow"],
+          "attributes": {}
+        }
+      ],
+      "subsections": [],
+      "validation_rules": [],
+      "conditional_display": null
+    },
+    {
+      "section_id": "situation_summary",
+      "title": "Situation Summary",
+      "description": "Current incident situation and conditions",
+      "order": 3,
+      "required": true,
+      "repeatable": false,
+      "max_repetitions": null,
+      "fields": [
+        {
+          "field_id": "current_situation",
+          "label": "Current Situation",
+          "field_type": {
+            "type": "textarea",
+            "max_length": 2000,
+            "rows": 6
+          },
+          "required": true,
+          "default_value": null,
+          "placeholder": "Describe the current incident situation, including what happened, current conditions, and immediate concerns...",
+          "help_text": "Provide a concise summary of the current incident situation including nature, scope, and current status",
+          "validation_rules": [
+            {
+              "rule_id": "situation_required",
+              "rule_type": {
+                "type": "required"
+              },
+              "error_message": "Current situation description is required",
+              "warning_message": null,
+              "target_fields": ["current_situation"],
+              "condition": null
+            },
+            {
+              "rule_id": "situation_min_length",
+              "rule_type": {
+                "type": "min_length",
+                "min": 20
+              },
+              "error_message": "Situation summary should be at least 20 characters",
+              "warning_message": "Consider providing more detail about the current situation",
+              "target_fields": ["current_situation"],
+              "condition": null
+            }
+          ],
+          "conditional_display": null,
+          "order": 1,
+          "readonly": false,
+          "css_classes": ["situation-summary"],
+          "attributes": {}
+        }
+      ],
+      "subsections": [],
+      "validation_rules": [],
+      "conditional_display": null
+    },
+    {
+      "section_id": "initial_objectives",
+      "title": "Initial Response Objectives",
+      "description": "Priority objectives for the initial operational period",
+      "order": 4,
+      "required": true,
+      "repeatable": false,
+      "max_repetitions": null,
+      "fields": [
+        {
+          "field_id": "primary_objectives",
+          "label": "Primary Objectives",
+          "field_type": {
+            "type": "textarea",
+            "max_length": 1500,
+            "rows": 5
+          },
+          "required": true,
+          "default_value": null,
+          "placeholder": "1. Life safety - protect responders and public\n2. Incident stabilization - contain/control the incident\n3. Property conservation - minimize damage...",
+          "help_text": "List the priority objectives for this operational period in order of importance",
+          "validation_rules": [
+            {
+              "rule_id": "objectives_required",
+              "rule_type": {
+                "type": "required"
+              },
+              "error_message": "Initial response objectives are required",
+              "warning_message": null,
+              "target_fields": ["primary_objectives"],
+              "condition": null
+            }
+          ],
+          "conditional_display": null,
+          "order": 1,
+          "readonly": false,
+          "css_classes": ["primary-objectives"],
+          "attributes": {}
+        }
+      ],
+      "subsections": [],
+      "validation_rules": [],
+      "conditional_display": null
+    },
+    {
+      "section_id": "current_organization",
+      "title": "Current Organization",
+      "description": "Command and general staff assignments",
+      "order": 5,
+      "required": true,
+      "repeatable": false,
+      "max_repetitions": null,
+      "fields": [
+        {
+          "field_id": "incident_commander",
+          "label": "Incident Commander",
+          "field_type": {
+            "type": "person_info",
+            "required_fields": ["name", "position", "agency"]
+          },
+          "required": true,
+          "default_value": null,
+          "placeholder": null,
+          "help_text": "Person responsible for overall incident management",
+          "validation_rules": [
+            {
+              "rule_id": "ic_required",
+              "rule_type": {
+                "type": "required"
+              },
+              "error_message": "Incident Commander information is required",
+              "warning_message": null,
+              "target_fields": ["incident_commander"],
+              "condition": null
+            }
+          ],
+          "conditional_display": null,
+          "order": 1,
+          "readonly": false,
+          "css_classes": ["incident-commander"],
+          "attributes": {}
+        },
+        {
+          "field_id": "deputy_ic",
+          "label": "Deputy IC",
+          "field_type": {
+            "type": "person_info",
+            "required_fields": ["name"]
+          },
+          "required": false,
+          "default_value": null,
+          "placeholder": null,
+          "help_text": "Deputy Incident Commander (if assigned)",
+          "validation_rules": [],
+          "conditional_display": null,
+          "order": 2,
+          "readonly": false,
+          "css_classes": ["deputy-ic"],
+          "attributes": {}
+        },
+        {
+          "field_id": "safety_officer",
+          "label": "Safety Officer",
+          "field_type": {
+            "type": "person_info",
+            "required_fields": ["name"]
+          },
+          "required": false,
+          "default_value": null,
+          "placeholder": null,
+          "help_text": "Person responsible for safety oversight",
+          "validation_rules": [],
+          "conditional_display": null,
+          "order": 3,
+          "readonly": false,
+          "css_classes": ["safety-officer"],
+          "attributes": {}
+        },
+        {
+          "field_id": "information_officer",
+          "label": "Information Officer",
+          "field_type": {
+            "type": "person_info",
+            "required_fields": ["name"]
+          },
+          "required": false,
+          "default_value": null,
+          "placeholder": null,
+          "help_text": "Person responsible for media and public information",
+          "validation_rules": [],
+          "conditional_display": null,
+          "order": 4,
+          "readonly": false,
+          "css_classes": ["information-officer"],
+          "attributes": {}
+        }
+      ],
+      "subsections": [],
+      "validation_rules": [],
+      "conditional_display": null
+    },
+    {
+      "section_id": "resource_summary",
+      "title": "Resource Summary",
+      "description": "Resources currently assigned to the incident",
+      "order": 6,
+      "required": false,
+      "repeatable": false,
+      "max_repetitions": null,
+      "fields": [
+        {
+          "field_id": "resources_assigned",
+          "label": "Resources Currently Assigned",
+          "field_type": {
+            "type": "table",
+            "columns": [
+              {
+                "column_id": "resource_identifier",
+                "title": "Resource Identifier",
+                "field_type": {
+                  "type": "text",
+                  "max_length": 50
+                },
+                "required": true,
+                "width": "200px"
+              },
+              {
+                "column_id": "resource_category",
+                "title": "Category",
+                "field_type": {
+                  "type": "select",
+                  "options": [
+                    {"value": "overhead", "label": "Overhead", "disabled": false, "group": null},
+                    {"value": "engines", "label": "Engines", "disabled": false, "group": null},
+                    {"value": "trucks", "label": "Trucks", "disabled": false, "group": null},
+                    {"value": "crews", "label": "Crews", "disabled": false, "group": null},
+                    {"value": "aircraft", "label": "Aircraft", "disabled": false, "group": null},
+                    {"value": "equipment", "label": "Equipment", "disabled": false, "group": null}
+                  ],
+                  "multiple": false,
+                  "searchable": true
+                },
+                "required": true,
+                "width": "150px"
+              },
+              {
+                "column_id": "resource_kind_type",
+                "title": "Kind/Type",
+                "field_type": {
+                  "type": "text",
+                  "max_length": 30
+                },
+                "required": false,
+                "width": "120px"
+              },
+              {
+                "column_id": "date_time_ordered",
+                "title": "Date/Time Ordered",
+                "field_type": {
+                  "type": "datetime"
+                },
+                "required": false,
+                "width": "150px"
+              },
+              {
+                "column_id": "eta",
+                "title": "ETA",
+                "field_type": {
+                  "type": "datetime"
+                },
+                "required": false,
+                "width": "120px"
+              },
+              {
+                "column_id": "location_assignment",
+                "title": "Location/Assignment",
+                "field_type": {
+                  "type": "text",
+                  "max_length": 100
+                },
+                "required": false,
+                "width": "200px"
+              }
+            ],
+            "min_rows": 0,
+            "max_rows": 50
+          },
+          "required": false,
+          "default_value": null,
+          "placeholder": null,
+          "help_text": "List all resources currently assigned to this incident",
+          "validation_rules": [],
+          "conditional_display": null,
+          "order": 1,
+          "readonly": false,
+          "css_classes": ["resource-table"],
+          "attributes": {}
+        }
+      ],
+      "subsections": [],
+      "validation_rules": [],
+      "conditional_display": null
+    }
+  ],
+  "validation_rules": [
+    {
+      "rule_id": "incident_info_complete",
+      "rule_type": {
+        "type": "custom",
+        "validator": "incident_completeness_check",
+        "config": {
+          "required_sections": ["incident_header", "situation_summary", "initial_objectives", "current_organization"]
+        }
+      },
+      "error_message": "All required incident information sections must be completed",
+      "warning_message": null,
+      "target_fields": ["incident_name", "current_situation", "primary_objectives", "incident_commander"],
+      "condition": null
+    }
+  ],
+  "conditional_logic": [
+    {
+      "rule_id": "show_deputy_ic_contact",
+      "condition": {
+        "type": "field_not_empty",
+        "field": "deputy_ic"
+      },
+      "actions": [
+        {
+          "type": "require_field",
+          "field": "deputy_ic"
+        }
+      ]
+    }
+  ],
+  "defaults": {
+    "incident_name": "",
+    "north_arrow": false
+  }
+}
