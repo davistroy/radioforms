@@ -646,7 +646,7 @@ pub struct ICS213Data {
 /// - Emergency: Life safety threat, immediate action required
 /// - Urgent: Significant impact, response within 1 hour
 /// - Routine: Normal business, response within 8 hours
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MessagePriority {
     Emergency,
     Urgent,

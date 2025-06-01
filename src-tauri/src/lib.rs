@@ -27,6 +27,7 @@ mod database;
 mod models;
 mod commands;
 mod utils;
+mod templates;
 
 use database::Database;
 use commands::*;
