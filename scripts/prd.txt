@@ -1,0 +1,283 @@
+# Product Requirements Document (PRD)
+# ICS Forms Management Application
+
+**Version:** 2.0  
+**Date:** May 31, 2025  
+**Status:** Production-Ready Foundation Complete
+
+## 1. Introduction
+
+### 1.1 Purpose
+This document defines the requirements for a standalone, offline-first desktop application that enables users to create, manage, export, and archive FEMA Incident Command System (ICS) forms. The application provides administrative staff and radio operators with a modern, intuitive web-based interface for managing ICS forms while supporting offline operation and multiple export formats.
+
+### 1.2 Project Scope
+The application is a **STANDALONE, PORTABLE** cross-platform desktop application that consists of a single executable file and a single data file. It stores form data in a SQLite database and allows a single user to create, manage, and export FEMA ICS forms in various formats. The application runs completely offline without internet connection and can be deployed by simply copying two files.
+
+**Key Design Principles**: Maximum simplicity, zero installation required, portable operation (runs from flash drive), intuitive single-user interface requiring no training, and fully documented code with zero technical debt.
+
+## 2. Overall Description
+
+### 2.1 Product Perspective
+The ICS Forms Management Application is a new, standalone system designed to replace the current process of using individual PDF forms stored locally on hard drives. It provides a comprehensive solution for managing ICS forms in an offline environment, with the ability to export forms in various formats including JSON, PDF, and radio-transmissible text.
+
+### 2.2 Operating Environment
+* **Portable Operation**: Single executable file that runs on Windows, macOS, and Linux
+* **Flash Drive Compatible**: Application and data can run from any storage location
+* **No Installation Required**: Zero-dependency deployment - just copy and run
+* **Minimum Requirements**: 1280x720 screen resolution, 4GB RAM
+* **Self-Contained**: No internet connection required, no external dependencies
+* **Simple Deployment**: Application = 1 executable file + 1 database file
+
+### 2.3 Current Status: Production-Ready Foundation
+The application now has a solid, zero-debt foundation with:
+- ✅ **Real Rust backend** with SQLite database (SQLx 0.8+)
+- ✅ **Modern React frontend** with TypeScript 5.8+ and Enterprise UI
+- ✅ **Zero security vulnerabilities** and latest dependencies
+- ✅ **Production build working** - generates optimized single executable
+- ✅ **Comprehensive testing foundation** ready for feature development
+- ✅ **Enterprise-grade UI system** with accessibility and performance standards
+
+**Ready for Phase 2: Core Functionality Development**
+
+## 3. System Features
+
+### 3.1 Form Management
+**Priority: HIGH** - Core functionality enabling users to create, edit, save, and manage ICS forms within the application.
+
+**Requirements:**
+- Support all 20 standard ICS forms (ICS-201 through ICS-225)
+- Create new form instances from templates
+- Save forms in draft state for later completion
+- Duplicate existing forms as starting points
+- Validate form data according to ICS specifications
+- Form lifecycle: Draft → Completed → Final → Archived
+- Auto-save every 30 seconds when data changes
+- Support for up to 2,000 forms per database without performance degradation
+
+**Search Functionality:**
+- Incident name: Partial string matching, case-insensitive, minimum 2 characters
+- Form type: Exact match selection from dropdown of available form types
+- Date range: From/to date selection with calendar picker, defaults to last 30 days
+- Preparer name: Partial name matching, case-insensitive
+- Results sorted by last modified date (newest first), maximum 100 results per page
+- Search performance: Results returned within 1 second for databases up to 2,000 forms
+
+### 3.2 Data Export and Import
+**Priority: HIGH** - Functionality to export completed forms to various formats and import existing form data.
+
+**Requirements:**
+- Export forms to PDF format matching official FEMA layouts
+- Export form data to JSON format for interchange
+- Export form data to ICS-DES format for radio transmission
+- Export individual forms or batches of forms
+- Support importing form data from JSON files
+- Exported PDFs maintain proper pagination and formatting
+- Export preview before file generation
+- PDF export completes within 10 seconds for complex forms
+- Exported files under 5MB for individual forms
+
+### 3.3 Database Management
+**Priority: HIGH** - Local data storage and management functionality using SQLite database.
+
+**Requirements:**
+- Store all form data in a local SQLite database
+- Backup entire database to external files
+- Restore from database backup files
+- Support multiple database files for different incidents
+- Transaction support for data integrity
+- Database compaction functionality
+- Automatic migrations for version updates
+- Database operations complete within 5 seconds for normal usage
+- Portable backup files between different installations
+
+### 3.4 User Interface
+**Priority: HIGH** - Modern, responsive web-based interface running within a native desktop application.
+
+**Requirements:**
+- Tabbed interface for working with multiple forms
+- Customizable interface themes (light/dark mode)
+- Keyboard shortcuts for common operations
+- Contextual help and field-level guidance
+- Resizable and rearrangeable interface elements
+- Fully responsive for different screen sizes
+- WCAG 2.1 AA accessibility standards compliance
+- Interface responsiveness under 100ms for user interactions
+- Keyboard navigation for all functional elements
+
+### 3.5 Form Validation and Business Rules
+**Priority: HIGH** - Comprehensive validation system ensuring form data meets ICS standards and business requirements.
+
+**Requirements:**
+- Validate required fields for each form type
+- Date and time fields validate format and logical consistency
+- Cross-field validations per ICS standards
+- Prevent saving of invalid forms
+- Clear, actionable validation error messages
+- Conditional field requirements support
+- Business rule violation indicators
+- Real-time validation as users input data
+- Validation messages displayed within 200ms
+
+## 4. Performance Requirements
+
+### 4.1 Application Performance
+- **Application startup time**: Under 3 seconds on minimum system requirements
+- **Form rendering**: Within 2 seconds for forms up to 100 fields
+- **Database queries**: Within 1 second for datasets up to 2,000 forms
+- **Export operations**: Progress feedback for operations taking >5 seconds
+- **UI responsiveness**: Interactive elements respond within 100ms
+
+### 4.2 Memory Usage Targets
+- **Light usage** (1-10 forms open): <128MB
+- **Normal usage** (10-50 forms open): <512MB  
+- **Heavy usage** (50+ forms open): <1GB
+- **Performance warnings**: Display at 75% of memory limits
+- **Automatic cleanup**: Release memory for inactive forms after 10 minutes
+
+### 4.3 System Requirements
+- **Minimum RAM**: 4GB, Recommended: 8GB
+- **Minimum CPU**: Dual-core 2.0GHz Intel/AMD x64
+- **Storage**: 500MB minimum, 2GB recommended
+- **Operating Systems**: 
+  - Windows 10 (build 1903+) or Windows 11
+  - macOS 10.15 (Catalina) or later
+  - Ubuntu 18.04 LTS or later
+
+## 5. Data Integrity and Safety Requirements
+
+### 5.1 Data Integrity Protection
+- Transaction management with automatic rollback on failure
+- Form data integrity verified with SHA-256 checksums
+- Database integrity checks on startup and after unexpected shutdowns
+- All file operations verified with read-back confirmation
+
+### 5.2 Automatic Recovery Procedures
+- Application crashes: Automatic recovery of unsaved form data from auto-save files
+- Database corruption: Automatic restoration from most recent valid backup
+- Disk space failures: Graceful degradation with user warnings when storage <100MB
+- Memory exhaustion: Automatic cleanup and restart recommendation
+
+### 5.3 Backup and Recovery
+- Daily incremental backups to user-configured location
+- Keep last 30 daily backups, with weekly archives for 6 months
+- Backup integrity verified weekly with restoration test
+- One-click manual backup option in File menu
+
+## 6. Standalone Application Requirements
+
+### 6.1 CRITICAL Success Criteria
+- **Simple Architecture**: Prefer simplicity over features - simpler solutions are always better
+- **Full Documentation**: Every function, method, and business logic decision thoroughly commented
+- **Easy Deployment**: Deployment = copy 2 files (executable + database), no installation wizard
+- **Intuitive Interface**: UI must be self-explanatory, requiring zero training
+- **Zero Technical Debt**: No placeholder code, no temporary solutions, no "we'll fix this later"
+
+### 6.2 Portability Requirements
+- **Single Executable**: Application compiles to one file per platform
+- **Single Database**: All data stored in one SQLite file that travels with the application
+- **Flash Drive Operation**: Must run perfectly from USB flash drive or any removable storage
+- **Relative Paths**: All file references relative to application location
+- **No Registry/Config Dependencies**: Application must not require system configuration
+
+### 6.3 Code Quality Standards
+- **Comprehensive Comments**: Every function must explain what it does and why
+- **Self-Documenting Code**: Variable and function names must be descriptive
+- **Simple Patterns**: Use straightforward, well-known patterns over clever solutions
+- **Junior Developer Friendly**: Any junior developer should understand the code within 30 minutes
+- **Maintainable Design**: Code structure must make modifications and troubleshooting easy
+
+## 7. Quality Attributes
+
+### 7.1 Reliability
+- Mean time between failures must exceed 40 hours of usage
+- Automatic data recovery from unexpected shutdowns
+- Graceful handling of disk space limitations
+
+### 7.2 Usability
+- New users must be able to create their first form within 10 minutes
+- Common tasks must be achievable in under 5 clicks
+- Interface must be learnable by users with basic computer skills
+
+### 7.3 Maintainability
+- Modular architecture enabling independent component updates
+- Clear separation between form definitions and application logic
+- Comprehensive logging for troubleshooting support
+
+### 7.4 Portability
+- Single executable deployment for each target platform
+- Consistent behavior across Windows, macOS, and Linux
+- No external dependencies beyond embedded runtime
+
+## 8. Supported ICS Forms
+
+The application must support all 20 standard ICS forms:
+- ICS-201: Incident Briefing
+- ICS-202: Incident Objectives
+- ICS-203: Organization Assignment List
+- ICS-204: Assignment List
+- ICS-205: Incident Radio Communications Plan
+- ICS-205A: Communications List
+- ICS-206: Medical Plan
+- ICS-207: Incident Organization Chart
+- ICS-208: Safety Analysis
+- ICS-209: Incident Status Summary
+- ICS-210: Resource Status Change
+- ICS-211: Incident Check-In List
+- ICS-213: General Message Form
+- ICS-214: Unit Log
+- ICS-215: Operational Planning Worksheet
+- ICS-215A: Incident Action Plan Safety Analysis
+- ICS-218: Support Vehicle/Equipment Inventory
+- ICS-220: Air Operations Summary
+- ICS-221: Demobilization Check-Out
+- ICS-225: Incident Personnel Performance Rating
+
+Each form type has specific field requirements, validation rules, and business logic as detailed in the individual form analysis documents.
+
+## 9. Implementation Phases
+
+### Phase 1: Project Foundation (COMPLETED)
+- ✅ Project setup and development environment
+- ✅ Database schema implementation 
+- ✅ Rust backend foundation with Tauri commands
+- ✅ React frontend foundation with Enterprise UI system
+- ✅ Form template system and basic operations
+
+### Phase 2: Core Functionality (CURRENT PHASE)
+- Form Management System with CRUD operations
+- Form Validation System with comprehensive business rules
+- Search & Filtering functionality
+- Basic Export System (PDF, JSON)
+- Testing & Quality Assurance
+
+### Phase 3: Advanced Features
+- ICS-DES Export System for radio transmission
+- Enhanced UI/UX with accessibility improvements
+- Data Management with backup/restore functionality
+- Performance optimization
+
+### Phase 4: Deployment & Polish
+- Build system optimization for single executable
+- Cross-platform compatibility verification
+- Documentation completion
+- Final testing and deployment preparation
+
+## 10. Success Metrics
+
+### Development Success Indicators
+- **Code Quality**: Every function thoroughly documented and easily understood
+- **Performance**: All targets met on minimum hardware specifications
+- **Simplicity**: Junior developer can understand codebase within 30 minutes
+- **Maintainability**: Future modifications are straightforward and predictable
+
+### User Success Indicators
+- **Deployment Speed**: Application running within 2 minutes of file copy
+- **Learning Curve**: Emergency management professionals productive within 10 minutes
+- **Reliability**: Application runs without issues for extended periods
+- **Portability**: Works consistently across different environments and storage types
+
+### Technical Success Indicators
+- **Build Size**: Executable files within targets for all platforms (Windows <50MB, macOS <60MB, Linux <45MB)
+- **Startup Time**: Application launches within 3 seconds on minimum hardware
+- **Memory Usage**: Stays within defined limits during normal operation
+- **Database Performance**: All operations complete within specified timeframes

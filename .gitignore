@@ -510,3 +510,21 @@ coverage.xml
 # - Maintains essential project configuration files
 # - Supports cross-platform development (Windows, macOS, Linux)
 # - Optimized for standalone application development
+
+# Added by Claude Task Master
+# Logs
+logs
+dev-debug.log
+# Environment variables
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# OS specific
+# Task files
+tasks.json
+tasks/ 
