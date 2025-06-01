@@ -22,6 +22,7 @@ use chrono::{DateTime, Utc};
 use crate::database::Database;
 use crate::models::form::{FormModel, CreateFormRequest, UpdateFormRequest, FormFilters, FormSearchResult};
 use crate::database::schema::{Form, ICSFormType, FormStatus};
+use crate::templates::loader::TemplateLoader;
 
 /// Application state containing database connection
 pub type AppState = Arc<Mutex<Database>>;
@@ -127,12 +128,51 @@ pub async fn create_form(
     
     let form_model = FormModel::new(database_clone);
 
+    // Enhanced template-based form creation
+    let mut enhanced_initial_data = initial_data.unwrap_or_default();
+    
+    // If template_id is provided, load template and populate defaults
+    if template_id.is_some() {
+        // Load template data from the comprehensive template system
+        match TemplateLoader::new() {
+            Ok(template_loader) => {
+                if let Some(template) = template_loader.get_template(&form_type.to_string()) {
+                    log::info!("Applying template '{}' for form type '{}'", template.template_id, form_type);
+                    
+                    // Populate form data with template defaults
+                    for (field_id, default_value) in &template.defaults {
+                        if !enhanced_initial_data.contains_key(field_id) {
+                            enhanced_initial_data.insert(field_id.clone(), default_value.clone());
+                        }
+                    }
+                    
+                    // Add template metadata to form data
+                    enhanced_initial_data.insert("template_id".to_string(), 
+                                                serde_json::Value::String(template.template_id.clone()));
+                    enhanced_initial_data.insert("template_version".to_string(), 
+                                                serde_json::Value::String(template.version.clone()));
+                    
+                    log::debug!("Applied {} default values from template", template.defaults.len());
+                } else {
+                    log::warn!("Template not found for form type: {}", form_type);
+                }
+            },
+            Err(e) => {
+                log::error!("Failed to load template loader: {}", e);
+                return Err(ErrorResponse {
+                    error: "Failed to load form templates".to_string(),
+                    details: Some(e.to_string()),
+                });
+            }
+        }
+    }
+    
     let request = CreateFormRequest {
         form_type,
         incident_name,
         incident_number,
         preparer_name,
-        initial_data,
+        initial_data: Some(enhanced_initial_data),
         operational_period_start,
         operational_period_end,
         template_id,
@@ -753,4 +793,142 @@ pub async fn get_database_stats(
     log::debug!("Database stats: {} total forms, {}% transaction success rate", 
                stats.total_forms, stats.transaction_stats.success_rate);
     Ok(stats)
+}
+
+/// Gets available form templates for form creation.
+/// 
+/// Business Logic:
+/// - Loads templates from the comprehensive template system
+/// - Returns template metadata for frontend display
+/// - Includes template versions and compatibility information
+/// 
+/// Frontend Usage:
+/// ```typescript
+/// const templates = await invoke('get_available_templates');
+/// console.log('Available templates:', templates);
+/// ```
+#[tauri::command]
+pub async fn get_available_templates() -> Result<Vec<TemplateInfo>, ErrorResponse> {
+    log::debug!("Fetching available form templates");
+
+    match TemplateLoader::new() {
+        Ok(template_loader) => {
+            let all_templates = template_loader.get_all_templates();
+            let mut template_infos = Vec::new();
+            
+            for (form_type, template) in all_templates {
+                template_infos.push(TemplateInfo {
+                    template_id: template.template_id.clone(),
+                    form_type: form_type.clone(),
+                    title: template.title.clone(),
+                    description: template.description.clone(),
+                    version: template.version.clone(),
+                    created_at: template.metadata.created_at.clone(),
+                    updated_at: template.metadata.updated_at.clone(),
+                    author: template.metadata.author.clone(),
+                    status: template.metadata.status.clone(),
+                    tags: template.metadata.tags.clone(),
+                    sections_count: template.sections.len(),
+                    fields_count: template_loader.get_template_stats().total_fields,
+                    validation_rules_count: template.validation_rules.len(),
+                });
+            }
+            
+            log::debug!("Retrieved {} available templates", template_infos.len());
+            Ok(template_infos)
+        },
+        Err(e) => {
+            log::error!("Failed to load template loader: {}", e);
+            Err(ErrorResponse {
+                error: "Failed to load form templates".to_string(),
+                details: Some(e.to_string()),
+            })
+        }
+    }
+}
+
+/// Gets template details for a specific form type.
+/// 
+/// Business Logic:
+/// - Loads template details including field definitions and help text
+/// - Returns comprehensive template structure for form building
+/// - Includes validation rules and conditional logic
+/// 
+/// Frontend Usage:
+/// ```typescript
+/// const template = await invoke('get_template_details', { formType: 'ICS-201' });
+/// if (template) {
+///   console.log('Template details:', template);
+/// }
+/// ```
+#[tauri::command]
+pub async fn get_template_details(
+    form_type: String,
+) -> Result<Option<FormTemplateDetails>, ErrorResponse> {
+    log::debug!("Fetching template details for form type: {}", form_type);
+
+    match TemplateLoader::new() {
+        Ok(template_loader) => {
+            if let Some(template) = template_loader.get_template(&form_type) {
+                let template_details = FormTemplateDetails {
+                    template_id: template.template_id.clone(),
+                    form_type: template.form_type.clone(),
+                    title: template.title.clone(),
+                    description: template.description.clone(),
+                    version: template.version.clone(),
+                    metadata: template.metadata.clone(),
+                    sections: template.sections.clone(),
+                    validation_rules: template.validation_rules.clone(),
+                    conditional_logic: template.conditional_logic.clone(),
+                    defaults: template.defaults.clone(),
+                };
+                
+                log::debug!("Retrieved template details for: {}", form_type);
+                Ok(Some(template_details))
+            } else {
+                log::debug!("Template not found for form type: {}", form_type);
+                Ok(None)
+            }
+        },
+        Err(e) => {
+            log::error!("Failed to load template loader: {}", e);
+            Err(ErrorResponse {
+                error: "Failed to load form templates".to_string(),
+                details: Some(e.to_string()),
+            })
+        }
+    }
+}
+
+/// Template information for frontend display
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TemplateInfo {
+    pub template_id: String,
+    pub form_type: String,
+    pub title: String,
+    pub description: String,
+    pub version: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub author: String,
+    pub status: String,
+    pub tags: Vec<String>,
+    pub sections_count: usize,
+    pub fields_count: usize,
+    pub validation_rules_count: usize,
+}
+
+/// Complete template details including sections and validation rules
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FormTemplateDetails {
+    pub template_id: String,
+    pub form_type: String,
+    pub title: String,
+    pub description: String,
+    pub version: String,
+    pub metadata: crate::templates::schema::TemplateMetadata,
+    pub sections: Vec<crate::templates::schema::FormSection>,
+    pub validation_rules: Vec<crate::templates::schema::ValidationRule>,
+    pub conditional_logic: Vec<crate::templates::schema::ConditionalRule>,
+    pub defaults: std::collections::HashMap<String, serde_json::Value>,
 }

@@ -26,11 +26,13 @@ use tauri::Manager;
 mod database;
 mod models;
 mod commands;
+mod services;
 mod utils;
 pub mod templates;
 
 use database::Database;
 use commands::*;
+use services::auto_save::AutoSaveService;
 
 /// Application state type for sharing database connection
 pub type AppState = Arc<Mutex<Database>>;
@@ -75,6 +77,10 @@ pub fn run() {
                         // Store database in application state
                         let state = Arc::new(Mutex::new(database));
                         app.manage(state);
+                        
+                        // Initialize auto-save state
+                        let auto_save_state: Arc<Mutex<Option<AutoSaveService>>> = Arc::new(Mutex::new(None));
+                        app.manage(auto_save_state);
                     },
                     Err(e) => {
                         log::error!("Failed to initialize database: {}", e);
@@ -98,6 +104,19 @@ pub fn run() {
             duplicate_form,
             get_form_types,
             get_database_stats,
+            
+            // Template management commands
+            get_available_templates,
+            get_template_details,
+            
+            // Auto-save commands
+            start_auto_save,
+            stop_auto_save,
+            track_form_change,
+            get_auto_save_status,
+            get_pending_changes_count,
+            force_save_all_changes,
+            configure_auto_save,
             
             // Keep the original greet command for testing
             greet

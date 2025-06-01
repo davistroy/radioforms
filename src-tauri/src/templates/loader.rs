@@ -26,6 +26,9 @@ use log::{debug, info, warn, error};
 
 use super::schema::*;
 use super::parser::{TemplateParser, ValidationConfig};
+use super::version::VersionManager;
+use super::help::{HelpManager, FieldHelp, ContextualHelp, ValidationMessage, HelpStats};
+use super::resources::{TemplateResources, TemplateResourceInfo};
 
 /// Template loader for embedded form template resources.
 /// 
