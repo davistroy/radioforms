@@ -29,6 +29,7 @@ use crate::database::migration_runner::{MigrationRunner, MigrationRunnerFactory}
 use crate::database::transactions::{TransactionManager, TransactionResult, TransactionStatsSnapshot};
 use crate::database::crud_operations::CrudOperations;
 use crate::database::errors::{DatabaseError, DatabaseResult, ErrorContext};
+use crate::database::integrity_checker::{IntegrityChecker, IntegrityCheckerFactory, IntegrityCheckResult};
 
 pub mod schema;
 pub mod migrations;
@@ -36,6 +37,7 @@ pub mod migration_runner;
 pub mod transactions;
 pub mod crud_operations;
 pub mod errors;
+pub mod integrity_checker;
 
 #[cfg(test)]
 mod migration_tests;
@@ -443,6 +445,33 @@ impl Database {
     /// - Useful for benchmarking and optimization efforts
     pub fn reset_transaction_stats(&self) {
         self.transaction_manager.reset_stats();
+    }
+
+    /// Performs comprehensive database integrity checks with detailed reporting.
+    /// 
+    /// Business Logic:
+    /// - Validates database consistency and constraint enforcement
+    /// - Checks business rules and data integrity requirements
+    /// - Provides detailed reporting with corrective action recommendations
+    /// - Supports both manual and automated integrity verification workflows
+    /// - Enables proactive identification of data corruption or inconsistencies
+    pub async fn check_integrity(&self) -> Result<IntegrityCheckResult> {
+        let checker = IntegrityCheckerFactory::create_production_checker(self.pool.clone());
+        checker.check_integrity().await
+            .context("Failed to perform comprehensive integrity check")
+    }
+
+    /// Performs quick integrity checks optimized for development environments.
+    /// 
+    /// Business Logic:
+    /// - Provides fast integrity validation for development workflows
+    /// - Focuses on critical integrity aspects while maintaining speed
+    /// - Supports continuous integration and testing pipelines
+    /// - Enables rapid feedback during development iterations
+    pub async fn check_integrity_fast(&self) -> Result<IntegrityCheckResult> {
+        let checker = IntegrityCheckerFactory::create_development_checker(self.pool.clone());
+        checker.check_integrity().await
+            .context("Failed to perform fast integrity check")
     }
 }
 
