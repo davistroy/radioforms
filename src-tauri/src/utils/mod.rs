@@ -1,24 +1,5 @@
 /*!
- * Utility modules for RadioForms application
+ * Simple utilities for RadioForms
  * 
- * This module contains various utility functions and helpers used
- * throughout the application for common operations like serialization,
- * data validation, file handling, and performance optimization.
- * 
- * Business Logic:
- * - Reusable utility functions for common operations
- * - Performance optimization helpers
- * - Data validation and transformation utilities
- * - Cross-cutting concerns and shared functionality
- * 
- * Design Philosophy:
- * - Keep utilities focused and single-purpose
- * - Provide comprehensive error handling
- * - Optimize for common use cases
- * - Zero dependencies on business logic
+ * Following MANDATORY.md: only include utilities that are actually used.
  */
-
-pub mod serialization;
-
-// Re-export only used utilities following MANDATORY.md - remove unused code
-// pub use serialization::{};  // Commented out until we need specific functions

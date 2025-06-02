@@ -20,7 +20,6 @@
  * - Future-ready architecture for template expansion
  */
 
-use std::collections::HashMap;
 use log::{debug, info, warn};
 
 /// Template resource manager for embedded template access.

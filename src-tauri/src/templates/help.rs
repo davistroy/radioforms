@@ -22,8 +22,8 @@
 
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use anyhow::{Result, anyhow, Context};
-use log::{debug, warn};
+use anyhow::Result;
+use log::debug;
 
 use super::schema::*;
 

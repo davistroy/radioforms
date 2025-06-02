@@ -22,8 +22,8 @@
 
 use anyhow::{Result, Context, anyhow};
 use serde_json;
-use std::collections::{HashMap, HashSet};
-use log::{debug, warn, error};
+use std::collections::HashSet;
+use log::{debug, warn};
 
 use super::schema::*;
 

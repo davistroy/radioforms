@@ -172,7 +172,7 @@ impl TemplateLoader {
     }
     
     /// Gets a template by form type and version.
-    pub fn get_template_version(&self, form_type: &str, version: &str) -> Option<&FormTemplate> {
+    pub fn get_template_version(&self, form_type: &str, _version: &str) -> Option<&FormTemplate> {
         // For now, return the current template if version is compatible
         if let Some(template) = self.templates.get(form_type) {
             if self.version_manager.is_compatible(&template.version) {
