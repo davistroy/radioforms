@@ -20,12 +20,5 @@
 
 pub mod serialization;
 
-// Re-export commonly used utilities
-pub use serialization::{
-    safe_to_json, 
-    safe_from_json, 
-    serialize_optimized, 
-    merge_json_objects,
-    validate_form_json,
-    SerializationMetrics,
-};
+// Re-export only used utilities following MANDATORY.md - remove unused code
+// pub use serialization::{};  // Commented out until we need specific functions

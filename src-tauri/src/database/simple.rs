@@ -7,6 +7,7 @@
 
 use sqlx::{SqlitePool, Row};
 use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
 
 /// Simple form data structure for emergency responders
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,7 +21,7 @@ pub struct SimpleForm {
     pub updated_at: String,
 }
 
-static mut DB_POOL: Option<SqlitePool> = None;
+static DB_POOL: OnceLock<SqlitePool> = OnceLock::new();
 
 /// Initialize database with simple schema
 pub async fn init_database(db_path: &str) -> Result<(), String> {
@@ -33,18 +34,14 @@ pub async fn init_database(db_path: &str) -> Result<(), String> {
         .await
         .map_err(|e| format!("Migration failed: {}", e))?;
     
-    unsafe {
-        DB_POOL = Some(pool);
-    }
+    DB_POOL.set(pool).map_err(|_| "Database already initialized".to_string())?;
     
     Ok(())
 }
 
 /// Get database pool
 fn get_db_pool() -> &'static SqlitePool {
-    unsafe {
-        DB_POOL.as_ref().expect("Database not initialized")
-    }
+    DB_POOL.get().expect("Database not initialized")
 }
 
 /// Save form data with validation

@@ -12,3 +12,6 @@
 
 pub mod simple;
 pub mod schema;
+
+#[cfg(test)]
+pub mod simple_tests;
