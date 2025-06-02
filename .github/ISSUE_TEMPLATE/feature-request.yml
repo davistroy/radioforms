@@ -1,0 +1,188 @@
+name: 💡 Feature Request
+description: Suggest a new feature or improvement for RadioForms
+title: "[FEATURE] "
+labels: ["enhancement", "feature-request", "needs-review"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # 💡 Feature Request
+        
+        Thank you for taking the time to suggest an improvement to RadioForms!
+        
+        **Note**: Feature requests are reviewed monthly and prioritized based on:
+        - Emergency response value
+        - Number of users who would benefit
+        - Implementation complexity
+        - Alignment with MANDATORY.md simplicity principles
+
+  - type: dropdown
+    id: feature-category
+    attributes:
+      label: Feature Category
+      description: What area of the application would this feature affect?
+      options:
+        - Form Creation and Editing
+        - Data Export (PDF, JSON, Radio)
+        - Search and Navigation
+        - User Interface and Experience
+        - Performance and Reliability
+        - Security and Compliance
+        - Training and Documentation
+        - System Administration
+        - Integration with Other Systems
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: user-type
+    attributes:
+      label: Primary User Type
+      description: Who would primarily benefit from this feature?
+      options:
+        - Emergency Responders (field personnel)
+        - Incident Commanders
+        - Communications Personnel
+        - Planning Section Staff
+        - Administrative Personnel
+        - IT Support Staff
+        - Training Coordinators
+        - All Users
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem-statement
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve?
+      placeholder: |
+        Describe the current situation that creates difficulty or inefficiency:
+        - What task is currently difficult or impossible?
+        - How does this impact emergency response operations?
+        - What workarounds are people currently using?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution
+      description: What would you like to see implemented?
+      placeholder: |
+        Describe your proposed solution:
+        - How would this feature work?
+        - How would users interact with it?
+        - What would the user interface look like?
+        - How would this integrate with existing functionality?
+    validations:
+      required: true
+
+  - type: textarea
+    id: emergency-value
+    attributes:
+      label: Emergency Response Value
+      description: How would this feature help during emergency incidents?
+      placeholder: |
+        Explain the emergency response benefits:
+        - How would this save time during critical operations?
+        - Would this improve accuracy or reduce errors?
+        - How many responders would benefit from this feature?
+        - Would this feature be useful during high-stress situations?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: urgency
+    attributes:
+      label: Urgency Level
+      description: How urgent is this feature request?
+      options:
+        - Critical - Needed for life-safety operations
+        - High - Would significantly improve emergency response
+        - Medium - Would improve efficiency and user experience
+        - Low - Nice to have enhancement
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-cases
+    attributes:
+      label: Specific Use Cases
+      description: Provide specific scenarios where this feature would be used
+      placeholder: |
+        Example scenarios:
+        1. During a wildfire incident, the IC needs to...
+        2. When coordinating medical response, personnel need to...
+        3. For multi-agency operations, commanders require...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives-considered
+    attributes:
+      label: Alternatives Considered
+      description: What other approaches have you considered?
+      placeholder: |
+        - Have you tried existing features that might solve this?
+        - Are there workarounds that partially address this need?
+        - Would modifications to existing features work instead?
+
+  - type: dropdown
+    id: implementation-complexity
+    attributes:
+      label: Estimated Implementation Complexity
+      description: How complex do you think this feature would be to implement?
+      options:
+        - Simple - Minor UI change or configuration option
+        - Moderate - New feature with some backend changes
+        - Complex - Major new functionality requiring significant development
+        - Unknown - Not sure about complexity
+
+  - type: checkboxes
+    id: mandatory-compliance
+    attributes:
+      label: MANDATORY.md Compliance
+      description: Please confirm this feature aligns with project principles
+      options:
+        - label: "This feature would help emergency responders do their job better"
+          required: true
+        - label: "This feature can be explained simply to someone at 2 AM during a crisis"
+          required: true
+        - label: "This feature would NOT add unnecessary complexity to the application"
+          required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any other information that would be helpful
+      placeholder: |
+        - References to standards or best practices
+        - Links to similar features in other applications
+        - Mockups or sketches (attach images)
+        - Feedback from other users
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        
+        ## 📋 Feature Request Review Process
+        
+        **What happens next:**
+        1. **Initial Review**: Feature requests are triaged within 1 week
+        2. **Monthly Planning**: All feature requests are reviewed monthly
+        3. **Priority Assessment**: Features are prioritized based on emergency response value
+        4. **Implementation Planning**: Approved features are added to the development roadmap
+        5. **Community Feedback**: High-value features may be opened for community discussion
+        
+        **Priority Factors:**
+        - Emergency response value (highest priority)
+        - Number of users who would benefit
+        - Implementation complexity vs. benefit
+        - Alignment with MANDATORY.md simplicity principles
+        - Available development resources
+        
+        Thank you for helping improve RadioForms for emergency responders!

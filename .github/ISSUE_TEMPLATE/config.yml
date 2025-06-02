@@ -1,0 +1,17 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 User Manual
+    url: https://github.com/davistroy/radioforms/blob/main/USER-MANUAL.md
+    about: Complete guide for emergency responders using RadioForms
+  - name: 🔧 Troubleshooting Guide
+    url: https://github.com/davistroy/radioforms/blob/main/TROUBLESHOOTING.md
+    about: Solutions for common problems and error messages
+  - name: 🚀 Quick Start Guide
+    url: https://github.com/davistroy/radioforms/blob/main/QUICK-START.md
+    about: Emergency reference card for getting started quickly
+  - name: 📞 Emergency Support (24/7)
+    url: mailto:emergency@radioforms-support.com?subject=[EMERGENCY]%20Critical%20Issue%20During%20Active%20Incident
+    about: For critical issues during active emergency incidents (email monitored 24/7)
+  - name: 📧 Standard Support
+    url: mailto:support@radioforms-support.com
+    about: For non-emergency questions and support (4-24 hour response)

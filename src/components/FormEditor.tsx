@@ -8,6 +8,9 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { formService } from '../services/formService';
 import { exportFormToPDF } from '../services/pdfService';
+import { FormStatus } from './FormStatus';
+import { ErrorSummary, ValidatedField } from './FormValidation';
+import { ValidationHelpers } from '../utils/validation';
 
 interface FormEditorProps {
   formId?: number;
@@ -21,12 +24,23 @@ interface FormData {
   form_data: string;
 }
 
+interface FormInfo {
+  id: number;
+  incident_name: string;
+  form_type: string;
+  status: string;
+  form_data: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export function FormEditor({ formId, onSave, onCancel }: FormEditorProps) {
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(!!formId);
+  const [currentForm, setCurrentForm] = useState<FormInfo | null>(null);
 
-  const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, setValue, formState: { errors }, setFocus } = useForm<FormData>({
     defaultValues: {
       incident_name: '',
       form_type: 'ICS-201',
@@ -48,6 +62,7 @@ export function FormEditor({ formId, onSave, onCancel }: FormEditorProps) {
       setInitialLoading(true);
       const form = await formService.getForm(formId);
       if (form) {
+        setCurrentForm(form);
         setValue('incident_name', form.incident_name);
         setValue('form_type', form.form_type);
         setValue('form_data', form.form_data);
@@ -82,6 +97,15 @@ export function FormEditor({ formId, onSave, onCancel }: FormEditorProps) {
     }
   };
 
+  const handleStatusChanged = (newStatus: string) => {
+    if (currentForm) {
+      setCurrentForm({
+        ...currentForm,
+        status: newStatus
+      });
+    }
+  };
+
   const handleExportPDF = async () => {
     if (!formId) {
       setError('Cannot export unsaved form. Please save first.');
@@ -111,6 +135,16 @@ export function FormEditor({ formId, onSave, onCancel }: FormEditorProps) {
         {formId ? 'Edit Form' : 'Create New Form'}
       </h2>
 
+      {/* Form validation error summary */}
+      <ErrorSummary 
+        errors={Object.entries(errors).map(([field, error]) => ({
+          field,
+          message: error?.message || 'Invalid value'
+        }))}
+        onNavigateToError={(field) => setFocus(field as keyof FormData)}
+      />
+
+      {/* General API errors */}
       {error && (
         <div 
           role="alert" 
@@ -121,18 +155,28 @@ export function FormEditor({ formId, onSave, onCancel }: FormEditorProps) {
         </div>
       )}
 
+      {/* Form Status Component for existing forms */}
+      {currentForm && (
+        <FormStatus
+          formId={currentForm.id}
+          currentStatus={currentForm.status}
+          onStatusChanged={handleStatusChanged}
+        />
+      )}
+
       <form 
         onSubmit={handleSubmit(onSubmit)} 
         className="space-y-4"
         noValidate
         aria-label={formId ? 'Edit form' : 'Create new form'}
       >
-        <div>
-          <label htmlFor="incident_name" className="block text-sm font-medium mb-1">
-            Incident Name *
-          </label>
+        <ValidatedField
+          label="Incident Name"
+          required
+          fieldId="incident_name"
+          error={errors.incident_name?.message}
+        >
           <input
-            id="incident_name"
             {...register('incident_name', { 
               required: 'Incident name is required',
               maxLength: {
@@ -142,30 +186,20 @@ export function FormEditor({ formId, onSave, onCancel }: FormEditorProps) {
             })}
             className="w-full p-2 border border-gray-300 rounded"
             placeholder="Enter incident name"
-            aria-required="true"
-            aria-invalid={errors.incident_name ? 'true' : 'false'}
-            aria-describedby={errors.incident_name ? 'incident_name_error' : undefined}
           />
-          {errors.incident_name && (
-            <p 
-              id="incident_name_error" 
-              className="text-red-600 text-sm mt-1"
-              aria-live="polite"
-            >
-              {errors.incident_name.message}
-            </p>
-          )}
-        </div>
+        </ValidatedField>
 
-        <div>
-          <label htmlFor="form_type" className="block text-sm font-medium mb-1">
-            Form Type
-          </label>
+        <ValidatedField
+          label="Form Type"
+          required
+          fieldId="form_type"
+          error={errors.form_type?.message}
+        >
           <select
-            id="form_type"
-            {...register('form_type')}
+            {...register('form_type', {
+              validate: ValidationHelpers.validFormType
+            })}
             className="w-full p-2 border border-gray-300 rounded"
-            aria-required="true"
             aria-label="Select ICS form type"
           >
             <option value="ICS-201">ICS-201 - Incident Briefing</option>
@@ -173,36 +207,27 @@ export function FormEditor({ formId, onSave, onCancel }: FormEditorProps) {
             <option value="ICS-203">ICS-203 - Organization Assignment List</option>
             <option value="ICS-204">ICS-204 - Assignment List</option>
             <option value="ICS-205">ICS-205 - Incident Radio Communications Plan</option>
+            <option value="ICS-213">ICS-213 - General Message</option>
+            <option value="ICS-214">ICS-214 - Unit Log</option>
+            <option value="ICS-215">ICS-215 - Operational Planning Worksheet</option>
           </select>
-        </div>
+        </ValidatedField>
 
-        <div>
-          <label htmlFor="form_data" className="block text-sm font-medium mb-1">
-            Form Data (JSON)
-          </label>
+        <ValidatedField
+          label="Form Data (JSON)"
+          required
+          fieldId="form_data"
+          error={errors.form_data?.message}
+        >
           <textarea
-            id="form_data"
             {...register('form_data', {
-              validate: (value) => {
-                try {
-                  JSON.parse(value);
-                  return true;
-                } catch {
-                  return 'Form data must be valid JSON format';
-                }
-              }
+              validate: ValidationHelpers.validJSON
             })}
             rows={6}
             className="w-full p-2 border border-gray-300 rounded font-mono text-sm"
             placeholder='{"field": "value"}'
-            aria-required="true"
-            aria-invalid={errors.form_data ? 'true' : 'false'}
-            aria-describedby={errors.form_data ? 'form_data_error' : 'form_data_help'}
           />
-          {errors.form_data && (
-            <p className="text-red-600 text-sm mt-1">{errors.form_data.message}</p>
-          )}
-        </div>
+        </ValidatedField>
 
         <div className="flex space-x-3">
           <button

@@ -1,0 +1,171 @@
+name: 📋 Standard Support Request
+description: Bug reports, feature requests, training questions, and general support
+title: "[SUPPORT] "
+labels: ["support", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # 📋 Standard Support Request
+        
+        **Expected Response Time: 4-24 hours**
+        
+        If this is an emergency during an active incident, please use the [Emergency Support](https://github.com/davistroy/radioforms/issues/new?template=emergency-support.yml) template instead.
+        
+        Before submitting, please check:
+        - [User Manual](USER-MANUAL.md)
+        - [Troubleshooting Guide](TROUBLESHOOTING.md)
+        - [Existing Issues](https://github.com/davistroy/radioforms/issues)
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Issue Type
+      description: What type of support do you need?
+      options:
+        - Bug Report - Something isn't working correctly
+        - Feature Request - Suggest a new feature or improvement
+        - Training Question - Help understanding how to use the application
+        - Configuration Help - Help with setup or configuration
+        - Performance Issue - Application is slow or uses too much memory
+        - Documentation Issue - Problem with documentation or guides
+        - Other - Something else
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority Level
+      description: How urgent is this issue?
+      options:
+        - Low - Cosmetic issue or enhancement idea
+        - Medium - Affects functionality but has workaround
+        - High - Affects functionality with no workaround
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Clear description of the issue or request
+      placeholder: |
+        Please provide a clear and detailed description of:
+        - What you're trying to accomplish
+        - What's happening instead
+        - What you expected to happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to Reproduce (for bugs)
+      description: If this is a bug, please provide step-by-step instructions
+      placeholder: |
+        1. Go to...
+        2. Click on...
+        3. Fill in...
+        4. See error...
+      value: |
+        1. 
+        2. 
+        3. 
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: What should happen?
+      placeholder: "Describe what you expected to happen"
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happens?
+      placeholder: "Describe what actually happens, including any error messages"
+
+  - type: input
+    id: os-version
+    attributes:
+      label: Operating System
+      description: What operating system are you using?
+      placeholder: "Windows 11, macOS 14.1, Ubuntu 22.04, etc."
+    validations:
+      required: true
+
+  - type: input
+    id: app-version
+    attributes:
+      label: Application Version
+      description: Check Help > About in the application
+      placeholder: "v1.0.0, v1.2.1, etc."
+    validations:
+      required: true
+
+  - type: input
+    id: database-size
+    attributes:
+      label: Database Size (if relevant)
+      description: Check the file size of radioforms.db
+      placeholder: "2.5 MB, 15 MB, etc."
+
+  - type: textarea
+    id: error-logs
+    attributes:
+      label: Error Messages or Logs
+      description: Include any error messages, console output, or log files
+      placeholder: |
+        Paste any error messages here...
+      render: text
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: If applicable, add screenshots to help explain the problem
+      placeholder: "Drag and drop images here or paste from clipboard"
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any other information that might be helpful
+      placeholder: |
+        - How often does this happen?
+        - Does it happen on other computers?
+        - When did this start happening?
+        - Any recent changes to your system?
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please confirm you've done the following
+      options:
+        - label: "I've checked the User Manual for guidance"
+        - label: "I've checked the Troubleshooting Guide"
+        - label: "I've searched existing issues to avoid duplicates"
+        - label: "I've provided all requested information above"
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        
+        ## 📞 Support Response Process
+        
+        **Standard Response Times:**
+        - **Initial Response**: Within 4 hours during business hours
+        - **Bug Fixes**: 24 hours for high priority, 1 week for others
+        - **Feature Requests**: Reviewed monthly, implemented based on priority
+        - **Training Questions**: Usually answered within 4 hours
+        
+        **Support Channels:**
+        - **GitHub Issues**: Primary support channel (this form)
+        - **Email**: support@radioforms-support.com
+        - **Documentation**: Check USER-MANUAL.md and TROUBLESHOOTING.md
+        
+        Thank you for helping improve RadioForms!

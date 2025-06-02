@@ -1,0 +1,159 @@
+name: 🚨 Emergency Support - Active Incident
+description: Critical issue during an active emergency incident requiring immediate response
+title: "[EMERGENCY] Critical Issue During Active Incident"
+labels: ["emergency", "priority-critical", "needs-immediate-response"]
+assignees:
+  - davistroy
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # ⚠️ EMERGENCY SUPPORT REQUEST
+        
+        **This template is for CRITICAL issues during ACTIVE emergency incidents only.**
+        
+        If this is not an emergency, please use the [Standard Support Request](https://github.com/davistroy/radioforms/issues/new?template=standard-support.yml) template instead.
+        
+        **Expected Response Time: 15 minutes maximum**
+
+  - type: checkboxes
+    id: emergency-confirmation
+    attributes:
+      label: Emergency Confirmation
+      description: Please confirm this is a true emergency situation
+      options:
+        - label: "✅ This is during an ACTIVE emergency incident"
+          required: true
+        - label: "✅ Emergency responders are waiting for form completion"
+          required: true
+        - label: "✅ This issue is preventing critical emergency operations"
+          required: true
+
+  - type: input
+    id: incident-type
+    attributes:
+      label: Incident Type
+      description: What type of emergency incident is occurring?
+      placeholder: "Fire, Medical Emergency, Natural Disaster, Search & Rescue, etc."
+    validations:
+      required: true
+
+  - type: input
+    id: incident-commander
+    attributes:
+      label: Incident Commander
+      description: Name and contact information for the incident commander
+      placeholder: "Name: John Smith, Radio: Channel 3, Phone: (555) 123-4567"
+    validations:
+      required: true
+
+  - type: input
+    id: time-sensitivity
+    attributes:
+      label: Time Sensitivity
+      description: How urgent is this? When do you need it working?
+      placeholder: "15 minutes, 1 hour, before next operational period, etc."
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem-description
+    attributes:
+      label: Problem Description
+      description: What exactly happened? Be specific about the failure.
+      placeholder: |
+        - What were you trying to do?
+        - What happened instead?
+        - What error messages appeared?
+        - When did this start happening?
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: immediate-impact
+    attributes:
+      label: Immediate Impact
+      description: What functionality is affected? (Check all that apply)
+      options:
+        - label: "Complete application failure - won't start"
+        - label: "Cannot create new forms"
+        - label: "Cannot save existing forms"
+        - label: "Cannot export critical data (PDF/radio)"
+        - label: "Data corruption suspected"
+        - label: "Application crashes when performing critical operations"
+
+  - type: input
+    id: affected-responders
+    attributes:
+      label: Number of Affected Responders
+      description: How many emergency responders are affected by this issue?
+      placeholder: "5 responders, entire incident command post, etc."
+    validations:
+      required: true
+
+  - type: input
+    id: os-version
+    attributes:
+      label: Operating System
+      description: What operating system are you using?
+      placeholder: "Windows 11, macOS 14.1, Ubuntu 22.04, etc."
+    validations:
+      required: true
+
+  - type: input
+    id: app-version
+    attributes:
+      label: Application Version
+      description: Check Help > About in the application
+      placeholder: "v1.0.0, v1.2.1, etc."
+    validations:
+      required: true
+
+  - type: input
+    id: database-size
+    attributes:
+      label: Database Size
+      description: Check the file size of radioforms.db
+      placeholder: "2.5 MB, 15 MB, etc."
+
+  - type: textarea
+    id: emergency-contact
+    attributes:
+      label: Emergency Contact Information
+      description: How can we reach you immediately for follow-up?
+      placeholder: |
+        - Primary Phone: (555) 123-4567
+        - Secondary Contact: Jane Doe (555) 987-6543
+        - Radio Channel: Channel 7
+        - Email: incident@emergency.gov
+    validations:
+      required: true
+
+  - type: textarea
+    id: workaround-attempts
+    attributes:
+      label: Workaround Attempts
+      description: What have you already tried to fix this?
+      placeholder: |
+        - Restarted the application
+        - Rebooted the computer
+        - Tried on a different computer
+        - etc.
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        
+        ## 📞 Emergency Response Process
+        
+        **After submitting this issue:**
+        1. **15 minutes**: Senior developer will be notified and respond
+        2. **30 minutes**: Lead developer will be contacted if needed
+        3. **60 minutes**: Emergency services liaison will be involved if necessary
+        
+        **Emergency Contact Numbers:**
+        - Support Emergency Line: (555) 123-EMERGENCY
+        - Email: emergency@radioforms-support.com (monitored 24/7)
+        
+        **You will receive an immediate acknowledgment of this issue within 15 minutes.**
