@@ -31,6 +31,38 @@ use crate::database::schema::{Form, FormStatus, ICSFormType};
 use crate::database::transactions::{TransactionResult, TransactionManager};
 use crate::database::errors::{DatabaseError, DatabaseResult};
 
+/// Concrete type enum for SQLx binding to replace Box<dyn sqlx::Encode>
+/// 
+/// This enum solves the trait object limitation in SQLx 0.8 where
+/// Encode, Decode, and Type traits are not dyn-compatible.
+#[derive(Debug, Clone)]
+pub enum SqlValue {
+    Text(String),
+    Integer(i64),
+    Real(f64),
+    Boolean(bool),
+    Null,
+}
+
+impl sqlx::Encode<'_, sqlx::Sqlite> for SqlValue {
+    fn encode_by_ref(&self, buf: &mut <sqlx::Sqlite as sqlx::Database>::ArgumentBuffer<'_>) -> sqlx::encode::IsNull {
+        match self {
+            SqlValue::Text(s) => s.encode_by_ref(buf),
+            SqlValue::Integer(i) => i.encode_by_ref(buf),
+            SqlValue::Real(f) => f.encode_by_ref(buf),
+            SqlValue::Boolean(b) => b.encode_by_ref(buf),
+            SqlValue::Null => sqlx::encode::IsNull::Yes,
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for SqlValue {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        // Default to TEXT type, SQLite is dynamically typed anyway
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
 /// Comprehensive CRUD operations manager for all database entities.
 /// 
 /// Business Logic:
@@ -372,7 +404,7 @@ impl CrudOperations {
                 }
 
                 let mut update_parts = Vec::new();
-                let mut update_values: Vec<Box<dyn sqlx::Encode<'_, sqlx::Sqlite> + Send + Sync>> = Vec::new();
+                let mut update_values: Vec<SqlValue> = Vec::new();
                 let mut value_index = 1;
 
                 // Build dynamic update query based on provided fields
@@ -381,13 +413,13 @@ impl CrudOperations {
                         return Err(anyhow!("Incident name cannot be empty"));
                     }
                     update_parts.push(format!("incident_name = ?{}", value_index));
-                    update_values.push(Box::new(incident_name.clone()));
+                    update_values.push(SqlValue::Text(incident_name.clone()));
                     value_index += 1;
                 }
 
                 if let Some(status) = &request.status {
                     update_parts.push(format!("status = ?{}", value_index));
-                    update_values.push(Box::new(status.to_string()));
+                    update_values.push(SqlValue::Text(status.to_string()));
                     value_index += 1;
 
                     // Create status history entry
@@ -414,25 +446,25 @@ impl CrudOperations {
                     let data_json = serde_json::to_string(data)
                         .context("Failed to serialize form data")?;
                     update_parts.push(format!("data = ?{}", value_index));
-                    update_values.push(Box::new(data_json));
+                    update_values.push(SqlValue::Text(data_json));
                     value_index += 1;
                 }
 
                 if let Some(notes) = &request.notes {
                     update_parts.push(format!("notes = ?{}", value_index));
-                    update_values.push(Box::new(notes.clone()));
+                    update_values.push(SqlValue::Text(notes.clone()));
                     value_index += 1;
                 }
 
                 if let Some(priority) = &request.priority {
                     update_parts.push(format!("priority = ?{}", value_index));
-                    update_values.push(Box::new(priority.clone()));
+                    update_values.push(SqlValue::Text(priority.clone()));
                     value_index += 1;
                 }
 
                 if let Some(workflow_position) = &request.workflow_position {
                     update_parts.push(format!("workflow_position = ?{}", value_index));
-                    update_values.push(Box::new(workflow_position.clone()));
+                    update_values.push(SqlValue::Text(workflow_position.clone()));
                     value_index += 1;
                 }
 
@@ -562,42 +594,42 @@ impl CrudOperations {
         
         // Build WHERE clause dynamically based on filters
         let mut where_conditions = Vec::new();
-        let mut bind_values: Vec<Box<dyn sqlx::Encode<'_, sqlx::Sqlite> + Send + Sync>> = Vec::new();
+        let mut bind_values: Vec<SqlValue> = Vec::new();
         let mut param_index = 1;
 
         if let Some(incident_name) = &filters.incident_name {
             where_conditions.push(format!("incident_name LIKE ?{}", param_index));
-            bind_values.push(Box::new(format!("%{}%", incident_name)));
+            bind_values.push(SqlValue::Text(format!("%{}%", incident_name)));
             param_index += 1;
         }
 
         if let Some(form_type) = &filters.form_type {
             where_conditions.push(format!("form_type = ?{}", param_index));
-            bind_values.push(Box::new(form_type.to_string()));
+            bind_values.push(SqlValue::Text(form_type.to_string()));
             param_index += 1;
         }
 
         if let Some(status) = &filters.status {
             where_conditions.push(format!("status = ?{}", param_index));
-            bind_values.push(Box::new(status.to_string()));
+            bind_values.push(SqlValue::Text(status.to_string()));
             param_index += 1;
         }
 
         if let Some(preparer_name) = &filters.preparer_name {
             where_conditions.push(format!("preparer_name LIKE ?{}", param_index));
-            bind_values.push(Box::new(format!("%{}%", preparer_name)));
+            bind_values.push(SqlValue::Text(format!("%{}%", preparer_name)));
             param_index += 1;
         }
 
         if let Some(date_from) = &filters.date_from {
             where_conditions.push(format!("date_created >= ?{}", param_index));
-            bind_values.push(Box::new(date_from.to_rfc3339()));
+            bind_values.push(SqlValue::Text(date_from.to_rfc3339()));
             param_index += 1;
         }
 
         if let Some(date_to) = &filters.date_to {
             where_conditions.push(format!("date_created <= ?{}", param_index));
-            bind_values.push(Box::new(date_to.to_rfc3339()));
+            bind_values.push(SqlValue::Text(date_to.to_rfc3339()));
             param_index += 1;
         }
 

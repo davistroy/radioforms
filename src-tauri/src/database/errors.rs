@@ -617,6 +617,12 @@ impl From<anyhow::Error> for DatabaseError {
     }
 }
 
+impl Into<anyhow::Error> for DatabaseError {
+    fn into(self) -> anyhow::Error {
+        anyhow::Error::msg(self.to_string())
+    }
+}
+
 /// Extracts table name from SQLite constraint error messages.
 fn extract_table_from_constraint(message: &str) -> Option<String> {
     // SQLite error format: "UNIQUE constraint failed: table_name.column_name"
