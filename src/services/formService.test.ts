@@ -163,7 +163,7 @@ describe('FormService', () => {
       const result = await formService.getAllForms();
 
       // Assert
-      expect(mockInvoke).toHaveBeenCalledWith('list_all_forms');
+      expect(mockInvoke).toHaveBeenCalledWith('get_all_forms');
       expect(result).toEqual(mockForms);
     });
   });

@@ -13,15 +13,18 @@
 
 import type { FormTemplate, ICSFormType } from '../types/forms';
 import { ics201Template } from './ics-201';
+import { ics202Template } from './ics-202';
+import { ics213Template } from './ics-213';
 
 /**
  * Registry of all available form templates
  */
 export const formTemplates: Partial<Record<ICSFormType, FormTemplate>> = {
   'ICS-201': ics201Template,
+  'ICS-202': ics202Template,
+  'ICS-213': ics213Template,
   
   // TODO: Implement remaining form templates in subsequent phases
-  // 'ICS-202': ics202Template,
   // 'ICS-203': ics203Template,
   // ... etc
 };
