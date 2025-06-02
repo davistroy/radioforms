@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { formService } from '../services/formService';
+import { exportFormToPDF } from '../services/pdfService';
 
 interface FormEditorProps {
   formId?: number;
@@ -78,6 +79,25 @@ export function FormEditor({ formId, onSave, onCancel }: FormEditorProps) {
       setError(err instanceof Error ? err.message : 'Failed to save form');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (!formId) {
+      setError('Cannot export unsaved form. Please save first.');
+      return;
+    }
+
+    try {
+      setError('');
+      const form = await formService.getForm(formId);
+      if (form) {
+        await exportFormToPDF(form);
+      } else {
+        setError('Form not found');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export PDF');
     }
   };
 
@@ -192,6 +212,16 @@ export function FormEditor({ formId, onSave, onCancel }: FormEditorProps) {
           >
             {loading ? 'Saving...' : (formId ? 'Update Form' : 'Create Form')}
           </button>
+          
+          {formId && (
+            <button
+              type="button"
+              onClick={handleExportPDF}
+              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+            >
+              Export PDF
+            </button>
+          )}
           
           {onCancel && (
             <button

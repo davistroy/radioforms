@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { formService, SimpleForm } from '../services/formService';
+import { exportFormToPDF, exportFormsSummaryToPDF } from '../services/pdfService';
 
 export function FormList() {
   const [forms, setForms] = useState<SimpleForm[]>([]);
@@ -40,6 +41,28 @@ export function FormList() {
     }
   };
 
+  const handleExportPDF = async (form: SimpleForm) => {
+    try {
+      setError('');
+      await exportFormToPDF(form);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export PDF');
+    }
+  };
+
+  const handleExportAllPDF = async () => {
+    try {
+      setError('');
+      if (forms.length === 0) {
+        setError('No forms to export');
+        return;
+      }
+      await exportFormsSummaryToPDF(forms);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export summary PDF');
+    }
+  };
+
   if (loading) {
     return <div className="text-center py-4">Loading forms...</div>;
   }
@@ -50,7 +73,17 @@ export function FormList() {
 
   return (
     <div className="form-list">
-      <h2 className="text-xl font-bold mb-4">All Forms</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold">All Forms</h2>
+        {forms.length > 0 && (
+          <button
+            onClick={handleExportAllPDF}
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+          >
+            Export Summary PDF
+          </button>
+        )}
+      </div>
       
       {forms.length === 0 ? (
         <p className="text-gray-500">No forms found</p>
@@ -65,12 +98,20 @@ export function FormList() {
                   <p className="text-sm text-gray-600">Status: {form.status}</p>
                   <p className="text-xs text-gray-400">Created: {form.created_at}</p>
                 </div>
-                <button 
-                  onClick={() => handleDelete(form.id)}
-                  className="text-red-600 hover:text-red-800 text-sm"
-                >
-                  Delete
-                </button>
+                <div className="flex space-x-2">
+                  <button 
+                    onClick={() => handleExportPDF(form)}
+                    className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                  >
+                    Export PDF
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(form.id)}
+                    className="text-red-600 hover:text-red-800 text-sm px-3 py-1"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             </div>
           ))}

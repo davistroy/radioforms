@@ -5,7 +5,7 @@
  * Tests search functionality, error handling, and accessibility.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { FormSearch } from './FormSearch';
 import { formService } from '../services/formService';
@@ -17,7 +17,7 @@ vi.mock('../services/formService', () => ({
   },
 }));
 
-const mockFormService = formService as any;
+const mockFormService = vi.mocked(formService);
 
 describe('FormSearch', () => {
   beforeEach(() => {
