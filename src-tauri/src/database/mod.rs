@@ -15,3 +15,6 @@ pub mod schema;
 
 #[cfg(test)]
 pub mod simple_tests;
+
+#[cfg(test)]
+pub mod integration_tests;

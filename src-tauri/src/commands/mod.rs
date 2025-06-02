@@ -19,5 +19,8 @@
 
 pub mod simple_commands;
 
+#[cfg(test)]
+pub mod integration_tests;
+
 // Re-export simple commands
 pub use simple_commands::*;
