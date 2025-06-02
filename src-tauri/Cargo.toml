@@ -4,6 +4,7 @@ version = "1.0.0"
 description = "RadioForms - STANDALONE ICS Forms Management Application"
 authors = ["RadioForms Team"]
 edition = "2021"
+default-run = "radioforms"
 
 # CRITICAL: Single executable configuration
 [[bin]]
