@@ -1,17 +1,21 @@
 ---
-name: Bug report
-about: Create a report to help us improve RadioForms
+name: 🐛 Bug Report (Non-Emergency)
+about: Report a bug or issue with RadioForms (NOT during active emergencies)
 title: '[BUG] '
 labels: 'bug'
 assignees: ''
 
 ---
 
-## Emergency Priority
-- [ ] **Critical** - Blocks active emergency response
-- [ ] **High** - Prevents normal operations 
-- [ ] **Medium** - Reduces efficiency
-- [ ] **Low** - Minor issue
+## ⚠️ Emergency Check
+**Is this occurring during an ACTIVE EMERGENCY INCIDENT?**
+- [ ] **NO** - This is the correct template
+- [ ] **YES** - Use the "🚨 EMERGENCY - Active Incident Support" template instead
+
+## Issue Priority
+- [ ] **High** - Prevents normal operations during training/planning
+- [ ] **Medium** - Reduces efficiency but workarounds available
+- [ ] **Low** - Minor issue, does not impact operations
 
 ## Quick Description
 **What happened?** A clear description of the bug.

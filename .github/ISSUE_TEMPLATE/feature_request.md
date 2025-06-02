@@ -1,11 +1,16 @@
 ---
-name: Feature request
-about: Suggest an idea for RadioForms
+name: 💡 Feature Request
+about: Suggest an idea or improvement for RadioForms
 title: '[FEATURE] '
 labels: 'enhancement'
 assignees: ''
 
 ---
+
+## ⚠️ Emergency Check
+**Is this request related to an ACTIVE EMERGENCY INCIDENT?**
+- [ ] **NO** - This is the correct template for feature suggestions
+- [ ] **YES** - Use the "🚨 EMERGENCY - Active Incident Support" template instead
 
 ## Emergency Responder Context
 **Your role:** Fire/EMS/Police/Emergency Management/Other: _______
