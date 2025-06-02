@@ -3,8 +3,8 @@
 **A standalone, portable desktop application for managing FEMA Incident Command System (ICS) forms**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)](https://github.com/example/radioforms)
-[![Status](https://img.shields.io/badge/Status-Production%20Ready%20(Simplified%20Architecture)-green)](https://github.com/example/radioforms)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)](https://github.com/davistroy/radioforms)
+[![Status](https://img.shields.io/badge/Status-Production%20Ready%20(Simplified%20Architecture)-green)](https://github.com/davistroy/radioforms)
 
 ---
 
@@ -110,7 +110,7 @@ sudo apt install libwebkit2gtk-4.0-dev \
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/example/radioforms.git
+   git clone https://github.com/davistroy/radioforms.git
    cd radioforms
    ```
 
@@ -435,7 +435,12 @@ npm run build:all-platforms
 - [x] Standalone deployment (single executable + database)
 - [x] PDF export functionality (working jsPDF integration)
 - [x] Simple search and filtering
-- [x] Basic form validation (comprehensive validation system)
+- [x] **Comprehensive Form Validation UI** (Task 17 Complete)
+  - [x] Field-level validation with clear error messages
+  - [x] Form-level error summary with navigation
+  - [x] Accessible validation with ARIA support
+  - [x] Real-time validation feedback
+  - [x] Screen reader compatibility
 - [x] Auto-save functionality
 - [x] Simplified architecture following MANDATORY.md principles
 - [x] **Code Quality**: Zero TypeScript errors, zero ESLint warnings
@@ -449,10 +454,15 @@ npm run build:all-platforms
   - [x] Automated release pipeline
 - [x] **Post-Deployment Support System**: Emergency-focused support infrastructure
   - [x] 24/7 emergency incident support with 15-minute response
-  - [x] Emergency hotfix deployment procedures (90-minute target)
+  - [x] Emergency hotfix deployment procedures (Type 1: 15min, Type 2: 30min, Type 3: 2hr)
   - [x] Multi-tier priority classification system
-  - [x] Comprehensive documentation for support staff
-  - [x] GitHub issue templates for emergency vs. non-emergency
+  - [x] Comprehensive SUPPORT-PROCESS.md documentation
+  - [x] **GitHub Issue Templates** for structured support
+    - [x] Emergency support template (active incidents, 15-minute response)
+    - [x] Standard support template (4-24 hour response)
+    - [x] Feature request template with emergency response value assessment
+    - [x] Template configuration with documentation links
+  - [x] Emergency hotfix deployment guide (EMERGENCY-HOTFIX-GUIDE.md)
 
 ### Future Enhancements
 - **Additional ICS Forms**: Complete ICS-203 through ICS-225 support
@@ -501,9 +511,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Discussions**: Join community discussions for questions and ideas
 
 ### Contact Information
-- **Project Repository**: [GitHub Repository](https://github.com/example/radioforms)
-- **Bug Reports**: [Issue Tracker](https://github.com/example/radioforms/issues)
-- **Feature Requests**: [Feature Request Form](https://github.com/example/radioforms/issues/new?template=feature_request.md)
+- **Project Repository**: [GitHub Repository](https://github.com/davistroy/radioforms)
+- **Bug Reports**: [Issue Tracker](https://github.com/davistroy/radioforms/issues)
+- **Feature Requests**: [Feature Request Form](https://github.com/davistroy/radioforms/issues/new?template=feature-request.yml)
 
 ---
 
