@@ -17,15 +17,7 @@
  * - Consistent error handling patterns
  */
 
-pub mod form_commands;
-pub mod settings_commands;
-pub mod export_commands;
-pub mod auto_save_commands;
-pub mod validation_commands;
+pub mod simple_commands;
 
-// Re-export all commands for easy registration
-pub use form_commands::*;
-pub use settings_commands::*;
-pub use export_commands::*;
-pub use auto_save_commands::*;
-pub use validation_commands::*;
+// Re-export simple commands
+pub use simple_commands::*;

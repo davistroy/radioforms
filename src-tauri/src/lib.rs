@@ -18,9 +18,7 @@
  * - SQLite for reliable data storage
  */
 
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tauri::Manager;
+// Simple imports for the simplified application
 
 // Import all modules
 mod database;
@@ -30,13 +28,7 @@ mod services;
 mod utils;
 pub mod templates;
 
-use database::Database;
 use commands::*;
-use services::auto_save::AutoSaveService;
-use models::validation::ValidationEngine;
-
-/// Application state type for sharing database connection
-pub type AppState = Arc<Mutex<Database>>;
 
 /// Initialize logging for the application.
 /// 
@@ -68,30 +60,13 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .setup(|app| {
-            // Initialize database connection
+        .setup(|_app| {
+            // Simple database initialization
+            let db_path = "radioforms.db";
             tauri::async_runtime::block_on(async {
-                match Database::new().await {
-                    Ok(database) => {
-                        log::info!("Database initialized successfully at: {:?}", database.database_path());
-                        
-                        // Store database in application state
-                        let state = Arc::new(Mutex::new(database));
-                        app.manage(state);
-                        
-                        // Initialize auto-save state
-                        let auto_save_state: Arc<Mutex<Option<AutoSaveService>>> = Arc::new(Mutex::new(None));
-                        app.manage(auto_save_state);
-                        
-                        // Initialize validation engine
-                        let validation_engine = ValidationEngine::new();
-                        let validation_state: Arc<Mutex<ValidationEngine>> = Arc::new(Mutex::new(validation_engine));
-                        app.manage(validation_state);
-                    },
-                    Err(e) => {
-                        log::error!("Failed to initialize database: {}", e);
-                        std::process::exit(1);
-                    }
+                if let Err(e) = database::simple::init_database(db_path).await {
+                    log::error!("Failed to initialize database: {}", e);
+                    std::process::exit(1);
                 }
             });
 
@@ -99,38 +74,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            // Form management commands
-            create_form,
-            get_form,
-            update_form,
-            delete_form,
-            search_forms,
-            get_forms_by_incident,
-            get_recent_forms,
-            duplicate_form,
-            get_form_types,
-            get_database_stats,
-            
-            // Template management commands
-            get_available_templates,
-            get_template_details,
-            
-            // Auto-save commands
-            start_auto_save,
-            stop_auto_save,
-            track_form_change,
-            get_auto_save_status,
-            get_pending_changes_count,
-            force_save_all_changes,
-            configure_auto_save,
-            
-            // Validation commands
-            validate_field,
-            validate_form,
-            get_validation_rules,
-            configure_validation,
-            
-            // Keep the original greet command for testing
+            save_form, get_form, update_form, 
+            search_forms, get_all_forms, delete_form,
             greet
         ])
         .run(tauri::generate_context!())

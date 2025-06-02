@@ -152,6 +152,7 @@ impl FormModel {
     /// - Returns None for non-existent forms
     pub async fn get_form_by_id(&self, id: i64) -> Result<Option<Form>> {
         self.database.crud().get_form_by_id(id).await
+            .map_err(|e| anyhow::anyhow!("Database error: {}", e))
     }
 
     /// Updates an existing form with optimistic locking and validation.
