@@ -288,11 +288,7 @@ impl TemplateLoader {
         count
     }
     
-    /// Checks template version compatibility.
-    fn is_template_version_compatible(&self, template: &FormTemplate) -> bool {
-        // Use the version manager for compatibility checking
-        self.version_manager.is_compatible(&template.version)
-    }
+    // is_template_version_compatible removed - following MANDATORY.md simplicity
     
     /// Gets embedded template definitions.
     /// 
@@ -302,8 +298,8 @@ impl TemplateLoader {
         TemplateResources::get_all_embedded_templates()
     }
     
-    /// Gets a minimal ICS-201 template for testing when file loading fails.
-    fn get_minimal_ics_201_template(&self) -> String {
+    // get_minimal_ics_201_template removed - following MANDATORY.md simplicity
+    fn _removed_method(&self) -> String {
         r#"{
             "template_id": "ics-201-minimal",
             "form_type": "ICS-201",

@@ -21,7 +21,7 @@
 use sqlx::FromRow;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
-use std::collections::HashMap;
+// HashMap import removed - following MANDATORY.md to remove unused imports
 
 /// Form status enumeration.
 /// Represents the lifecycle of an ICS form from creation to finalization.
@@ -195,127 +195,7 @@ pub struct Form {
 }
 
 impl Form {
-    /// Gets the form type as an enum
-    pub fn get_form_type(&self) -> anyhow::Result<ICSFormType> {
-        self.form_type.parse()
-    }
-    
-    /// Sets the form type from an enum
-    pub fn set_form_type(&mut self, form_type: ICSFormType) {
-        self.form_type = form_type.to_string();
-    }
-    
-    /// Gets the status as an enum
-    pub fn get_status(&self) -> anyhow::Result<FormStatus> {
-        self.status.parse()
-    }
-    
-    /// Sets the status from an enum
-    pub fn set_status(&mut self, status: FormStatus) {
-        self.status = status.to_string();
-    }
-
-    /// Parses the JSON data field into a structured HashMap.
-    /// 
-    /// Business Logic:
-    /// - Provides type-safe access to form field data
-    /// - Handles JSON parsing errors gracefully
-    /// - Returns HashMap for flexible field access
-    pub fn parse_data(&self) -> anyhow::Result<HashMap<String, serde_json::Value>> {
-        serde_json::from_str(&self.data)
-            .map_err(|e| anyhow::anyhow!("Failed to parse form data: {}", e))
-    }
-
-    /// Sets the form data from a HashMap.
-    /// 
-    /// Business Logic:
-    /// - Converts structured data back to JSON string
-    /// - Ensures data is properly serialized for storage
-    /// - Updates the updated_at timestamp
-    pub fn set_data(&mut self, data: HashMap<String, serde_json::Value>) -> anyhow::Result<()> {
-        self.data = serde_json::to_string(&data)
-            .map_err(|e| anyhow::anyhow!("Failed to serialize form data: {}", e))?;
-        self.updated_at = Utc::now();
-        Ok(())
-    }
-
-    /// Gets a specific field value from the form data.
-    /// 
-    /// Business Logic:
-    /// - Provides convenient access to individual form fields
-    /// - Returns None if field doesn't exist
-    /// - Handles JSON parsing transparently
-    pub fn get_field(&self, field_name: &str) -> anyhow::Result<Option<serde_json::Value>> {
-        let data = self.parse_data()?;
-        Ok(data.get(field_name).cloned())
-    }
-
-    /// Sets a specific field value in the form data.
-    /// 
-    /// Business Logic:
-    /// - Allows updating individual fields without replacing all data
-    /// - Automatically updates the updated_at timestamp
-    /// - Preserves other field values
-    pub fn set_field(&mut self, field_name: &str, value: serde_json::Value) -> anyhow::Result<()> {
-        let mut data = self.parse_data()?;
-        data.insert(field_name.to_string(), value);
-        self.set_data(data)
-    }
-
-    /// Validates that required fields are present for the form type.
-    /// 
-    /// Business Logic:
-    /// - Ensures form meets ICS standards before completion
-    /// - Returns list of missing required fields
-    /// - Form-type specific validation rules
-    pub fn validate_required_fields(&self) -> anyhow::Result<Vec<String>> {
-        let data = self.parse_data()?;
-        let mut missing_fields = Vec::new();
-
-        // Basic required fields for all forms
-        let basic_required = vec!["incident_name", "date_prepared", "time_prepared"];
-        
-        for field in basic_required {
-            if !data.contains_key(field) || data[field].is_null() {
-                missing_fields.push(field.to_string());
-            }
-        }
-
-        // Form-type specific validation could be added here
-        // This would reference the ICS form specifications
-
-        Ok(missing_fields)
-    }
-
-    /// Checks if the form can transition to the specified status.
-    /// 
-    /// Business Logic:
-    /// - Enforces proper workflow transitions
-    /// - Draft -> Completed -> Final (no backwards transitions)
-    /// - Validates required fields before status changes
-    pub fn can_transition_to(&self, new_status: &FormStatus) -> anyhow::Result<bool> {
-        let current_status = self.get_status()?;
-        match (&current_status, new_status) {
-            // Can always stay in same status
-            (current, new) if current == new => Ok(true),
-            
-            // Forward transitions
-            (FormStatus::Draft, FormStatus::Completed) => {
-                // Check if required fields are filled
-                let missing = self.validate_required_fields()?;
-                Ok(missing.is_empty())
-            },
-            (FormStatus::Completed, FormStatus::Final) => Ok(true),
-            (FormStatus::Draft, FormStatus::Final) => {
-                // Direct draft to final requires validation
-                let missing = self.validate_required_fields()?;
-                Ok(missing.is_empty())
-            },
-            
-            // Backwards transitions not allowed
-            _ => Ok(false),
-        }
-    }
+    // No unused methods - following MANDATORY.md simplicity principles
 }
 
 /// Application settings storage.
@@ -337,33 +217,7 @@ pub struct Setting {
 }
 
 impl Setting {
-    /// Creates a new setting with the given key and value.
-    pub fn new(key: String, value: serde_json::Value) -> anyhow::Result<Self> {
-        Ok(Self {
-            key,
-            value: serde_json::to_string(&value)?,
-            updated_at: Utc::now(),
-        })
-    }
-
-    /// Gets the setting value as a typed value.
-    pub fn get_value<T>(&self) -> anyhow::Result<T> 
-    where 
-        T: for<'de> Deserialize<'de>
-    {
-        serde_json::from_str(&self.value)
-            .map_err(|e| anyhow::anyhow!("Failed to deserialize setting value: {}", e))
-    }
-
-    /// Sets the setting value from a typed value.
-    pub fn set_value<T>(&mut self, value: T) -> anyhow::Result<()>
-    where 
-        T: Serialize
-    {
-        self.value = serde_json::to_string(&value)?;
-        self.updated_at = Utc::now();
-        Ok(())
-    }
+    // No unused methods - following MANDATORY.md simplicity principles
 }
 
 // ============================================================================
@@ -507,30 +361,7 @@ pub struct FormTemplate {
 }
 
 impl FormTemplate {
-    /// Parses the template data into a structured format.
-    /// 
-    /// Business Logic:
-    /// - Provides type-safe access to template structure
-    /// - Handles JSON parsing errors gracefully
-    /// - Returns HashMap for flexible field access
-    pub fn parse_template_data(&self) -> anyhow::Result<HashMap<String, serde_json::Value>> {
-        serde_json::from_str(&self.template_data)
-            .map_err(|e| anyhow::anyhow!("Failed to parse template data: {}", e))
-    }
-    
-    /// Parses the validation rules into a structured format.
-    /// 
-    /// Business Logic:
-    /// - Provides access to form-specific validation rules
-    /// - Returns empty vector if no rules are defined
-    /// - Handles JSON parsing errors gracefully
-    pub fn parse_validation_rules(&self) -> anyhow::Result<Vec<String>> {
-        match &self.validation_rules {
-            Some(rules) => serde_json::from_str(rules)
-                .map_err(|e| anyhow::anyhow!("Failed to parse validation rules: {}", e)),
-            None => Ok(Vec::new()),
-        }
-    }
+    // No unused methods - following MANDATORY.md simplicity principles
 }
 
 /// Validation rule record for reusable validation logic.
@@ -583,44 +414,7 @@ pub struct ValidationRule {
 }
 
 impl ValidationRule {
-    /// Parses the form types into a list.
-    /// 
-    /// Business Logic:
-    /// - Returns list of form types this rule applies to
-    /// - Returns None if rule applies to all forms
-    /// - Handles JSON parsing errors gracefully
-    pub fn parse_form_types(&self) -> anyhow::Result<Option<Vec<String>>> {
-        match &self.form_types {
-            Some(types) => {
-                let parsed: Vec<String> = serde_json::from_str(types)
-                    .map_err(|e| anyhow::anyhow!("Failed to parse form types: {}", e))?;
-                Ok(Some(parsed))
-            },
-            None => Ok(None),
-        }
-    }
-    
-    /// Parses the fields into a list.
-    /// 
-    /// Business Logic:
-    /// - Returns list of field names this rule validates
-    /// - Handles JSON parsing errors gracefully
-    /// - Always returns a vector (empty if parsing fails)
-    pub fn parse_fields(&self) -> anyhow::Result<Vec<String>> {
-        serde_json::from_str(&self.fields)
-            .map_err(|e| anyhow::anyhow!("Failed to parse fields: {}", e))
-    }
-    
-    /// Parses the validation logic into a structured format.
-    /// 
-    /// Business Logic:
-    /// - Provides access to the validation logic configuration
-    /// - Returns HashMap for flexible access to logic parameters
-    /// - Handles JSON parsing errors gracefully
-    pub fn parse_validation_logic(&self) -> anyhow::Result<HashMap<String, serde_json::Value>> {
-        serde_json::from_str(&self.validation_logic)
-            .map_err(|e| anyhow::anyhow!("Failed to parse validation logic: {}", e))
-    }
+    // No unused methods - following MANDATORY.md simplicity principles
 }
 
 /// Export configuration record for customizing output formats.
@@ -667,65 +461,5 @@ pub struct ExportConfiguration {
 }
 
 impl ExportConfiguration {
-    /// Parses the applicable form types.
-    /// 
-    /// Business Logic:
-    /// - Returns list of form types this configuration applies to
-    /// - Returns None if configuration applies to all forms
-    /// - Handles JSON parsing errors gracefully
-    pub fn parse_form_types(&self) -> anyhow::Result<Option<Vec<String>>> {
-        match &self.form_types {
-            Some(types) => {
-                let parsed: Vec<String> = serde_json::from_str(types)
-                    .map_err(|e| anyhow::anyhow!("Failed to parse form types: {}", e))?;
-                Ok(Some(parsed))
-            },
-            None => Ok(None),
-        }
-    }
-    
-    /// Parses the template data configuration.
-    /// 
-    /// Business Logic:
-    /// - Provides access to format-specific configuration
-    /// - Returns empty HashMap if no template data is defined
-    /// - Handles JSON parsing errors gracefully
-    pub fn parse_template_data(&self) -> anyhow::Result<HashMap<String, serde_json::Value>> {
-        match &self.template_data {
-            Some(data) => serde_json::from_str(data)
-                .map_err(|e| anyhow::anyhow!("Failed to parse template data: {}", e)),
-            None => Ok(HashMap::new()),
-        }
-    }
-    
-    /// Parses the field filters configuration.
-    /// 
-    /// Business Logic:
-    /// - Provides access to field filtering rules
-    /// - Returns empty vector if no filters are defined
-    /// - Handles JSON parsing errors gracefully
-    pub fn parse_field_filters(&self) -> anyhow::Result<Vec<HashMap<String, serde_json::Value>>> {
-        match &self.field_filters {
-            Some(filters) => serde_json::from_str(filters)
-                .map_err(|e| anyhow::anyhow!("Failed to parse field filters: {}", e)),
-            None => Ok(Vec::new()),
-        }
-    }
-    
-    /// Parses the ICS-DES specific configuration.
-    /// 
-    /// Business Logic:
-    /// - Provides access to ICS-DES format parameters
-    /// - Returns None if no ICS-DES configuration is defined
-    /// - Handles JSON parsing errors gracefully
-    pub fn parse_ics_des_config(&self) -> anyhow::Result<Option<HashMap<String, serde_json::Value>>> {
-        match &self.ics_des_config {
-            Some(config) => {
-                let parsed: HashMap<String, serde_json::Value> = serde_json::from_str(config)
-                    .map_err(|e| anyhow::anyhow!("Failed to parse ICS-DES config: {}", e))?;
-                Ok(Some(parsed))
-            },
-            None => Ok(None),
-        }
-    }
+    // No unused methods - following MANDATORY.md simplicity principles
 }

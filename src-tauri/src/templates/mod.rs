@@ -48,7 +48,6 @@ use anyhow::Result;
 pub struct TemplateManager {
     templates: HashMap<String, FormTemplate>,
     cache: HashMap<String, ParsedTemplate>,
-    version_compatibility: VersionManager,
 }
 
 impl TemplateManager {
@@ -57,7 +56,6 @@ impl TemplateManager {
         let mut manager = Self {
             templates: HashMap::new(),
             cache: HashMap::new(),
-            version_compatibility: VersionManager::new(),
         };
         
         manager.load_embedded_templates()?;
@@ -128,29 +126,4 @@ impl ParsedTemplate {
     }
 }
 
-/// Version compatibility manager for template migrations.
-/// 
-/// Business Logic:
-/// - Manages template version compatibility
-/// - Supports template migration between versions
-/// - Validates version constraints
-/// - Provides version upgrade paths
-#[derive(Debug, Clone)]
-pub struct VersionManager {
-    supported_versions: Vec<String>,
-    migration_paths: HashMap<String, String>,
-}
-
-impl VersionManager {
-    pub fn new() -> Self {
-        Self {
-            supported_versions: vec!["1.0".to_string()],
-            migration_paths: HashMap::new(),
-        }
-    }
-    
-    /// Checks if a template version is supported.
-    pub fn is_version_supported(&self, version: &str) -> bool {
-        self.supported_versions.contains(&version.to_string())
-    }
-}
+// VersionManager removed - not needed for simple single-user application following MANDATORY.md

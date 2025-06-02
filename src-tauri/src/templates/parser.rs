@@ -35,27 +35,21 @@ use super::schema::*;
 /// - Checks conditional logic consistency
 /// - Optimizes templates for runtime performance
 pub struct TemplateParser {
-    /// Validation configuration
-    validation_config: ValidationConfig,
-    
-    /// Field type registry for extensibility
-    field_type_registry: FieldTypeRegistry,
+    // Simplified - removed unused enterprise fields following MANDATORY.md
 }
 
 impl TemplateParser {
     /// Creates a new template parser with default configuration.
     pub fn new() -> Self {
         Self {
-            validation_config: ValidationConfig::default(),
-            field_type_registry: FieldTypeRegistry::default(),
+            // Simplified following MANDATORY.md
         }
     }
     
     /// Creates a template parser with custom configuration.
-    pub fn with_config(config: ValidationConfig) -> Self {
+    pub fn with_config(_config: ValidationConfig) -> Self {
         Self {
-            validation_config: config,
-            field_type_registry: FieldTypeRegistry::default(),
+            // Simplified following MANDATORY.md
         }
     }
     
@@ -600,36 +594,6 @@ impl Default for ValidationConfig {
     }
 }
 
-/// Registry for field type validation and parsing.
-#[derive(Debug, Clone)]
-pub struct FieldTypeRegistry {
-    supported_types: HashSet<String>,
-}
+// FieldTypeRegistry removed - not needed for simple application following MANDATORY.md
 
-impl Default for FieldTypeRegistry {
-    fn default() -> Self {
-        let mut supported_types = HashSet::new();
-        supported_types.insert("text".to_string());
-        supported_types.insert("textarea".to_string());
-        supported_types.insert("number".to_string());
-        supported_types.insert("date".to_string());
-        supported_types.insert("time".to_string());
-        supported_types.insert("datetime".to_string());
-        supported_types.insert("select".to_string());
-        supported_types.insert("radio".to_string());
-        supported_types.insert("checkbox".to_string());
-        supported_types.insert("boolean_checkbox".to_string());
-        supported_types.insert("email".to_string());
-        supported_types.insert("phone".to_string());
-        supported_types.insert("coordinates".to_string());
-        supported_types.insert("radio_frequency".to_string());
-        supported_types.insert("file".to_string());
-        supported_types.insert("signature".to_string());
-        supported_types.insert("ics_position".to_string());
-        supported_types.insert("person_info".to_string());
-        supported_types.insert("address".to_string());
-        supported_types.insert("table".to_string());
-        
-        Self { supported_types }
-    }
-}
+// FieldTypeRegistry implementation removed - following MANDATORY.md simplicity

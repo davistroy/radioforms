@@ -36,24 +36,21 @@ use super::schema::*;
 /// - Evaluates conditional logic and dependencies
 /// - Provides detailed validation results with actionable feedback
 pub struct TemplateValidator {
-    /// Validation configuration
-    config: ValidatorConfig,
-    
-    /// Compiled regex cache for performance
-    regex_cache: HashMap<String, Regex>,
+    // Simplified - removed unused enterprise fields following MANDATORY.md
 }
 
 impl TemplateValidator {
     /// Creates a new template validator with default configuration.
     pub fn new() -> Self {
-        Self::with_config(ValidatorConfig::default())
+        Self {
+            // Simplified following MANDATORY.md
+        }
     }
     
     /// Creates a template validator with custom configuration.
-    pub fn with_config(config: ValidatorConfig) -> Self {
+    pub fn with_config(_config: ValidatorConfig) -> Self {
         Self {
-            config,
-            regex_cache: HashMap::new(),
+            // Simplified following MANDATORY.md
         }
     }
     
@@ -561,14 +558,10 @@ impl TemplateValidator {
         }
     }
     
-    /// Gets or compiles a regex pattern.
-    fn get_or_compile_regex(&mut self, pattern: &str) -> Result<&Regex> {
-        if !self.regex_cache.contains_key(pattern) {
-            let regex = Regex::new(pattern)?;
-            self.regex_cache.insert(pattern.to_string(), regex);
-        }
-        
-        Ok(self.regex_cache.get(pattern).unwrap())
+    /// Gets or compiles a regex pattern (simplified).
+    fn get_or_compile_regex(&mut self, pattern: &str) -> Result<Regex> {
+        // Simplified - no caching for single-user app following MANDATORY.md
+        Regex::new(pattern).map_err(|e| anyhow::anyhow!("Invalid regex pattern: {}", e))
     }
     
     /// Validates email format.

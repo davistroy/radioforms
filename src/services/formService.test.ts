@@ -6,13 +6,17 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { formService } from './formService';
 
-// Mock Tauri's invoke function
-const mockInvoke = vi.fn();
+// Mock Tauri's invoke function - using factory function for vitest
 vi.mock('@tauri-apps/api/core', () => ({
-  invoke: mockInvoke,
+  invoke: vi.fn(),
 }));
+
+import { formService } from './formService';
+import { invoke } from '@tauri-apps/api/core';
+
+// Get the mocked invoke function
+const mockInvoke = vi.mocked(invoke);
 
 describe('FormService', () => {
   beforeEach(() => {
