@@ -36,3 +36,21 @@ pub async fn get_all_forms() -> Result<Vec<SimpleForm>, String> {
 pub async fn delete_form(id: i64) -> Result<bool, String> {
     simple::delete_form(id).await
 }
+
+// === FORM LIFECYCLE COMMANDS ===
+// Following MANDATORY.md: Simple commands for emergency responders
+
+#[tauri::command]
+pub async fn update_form_status(id: i64, new_status: String) -> Result<(), String> {
+    simple::update_form_status(id, new_status).await
+}
+
+#[tauri::command]
+pub async fn get_available_transitions(id: i64) -> Result<Vec<String>, String> {
+    simple::get_available_transitions(id).await
+}
+
+#[tauri::command]
+pub async fn can_edit_form(id: i64) -> Result<bool, String> {
+    simple::can_edit_form(id).await
+}

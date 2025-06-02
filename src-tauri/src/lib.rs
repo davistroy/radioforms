@@ -76,6 +76,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             save_form, get_form, update_form, 
             search_forms, get_all_forms, delete_form,
+            update_form_status, get_available_transitions, can_edit_form,
             greet
         ])
         .run(tauri::generate_context!())

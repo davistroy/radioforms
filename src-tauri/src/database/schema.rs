@@ -25,6 +25,7 @@ use chrono::{DateTime, Utc};
 
 /// Form status enumeration.
 /// Represents the lifecycle of an ICS form from creation to finalization.
+/// Following MANDATORY.md: Simple state machine for emergency responders.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum FormStatus {
@@ -34,6 +35,8 @@ pub enum FormStatus {
     Completed,
     /// Form has been finalized and is read-only
     Final,
+    /// Form has been archived for historical reference
+    Archived,
 }
 
 impl std::fmt::Display for FormStatus {
@@ -42,6 +45,7 @@ impl std::fmt::Display for FormStatus {
             FormStatus::Draft => write!(f, "draft"),
             FormStatus::Completed => write!(f, "completed"),
             FormStatus::Final => write!(f, "final"),
+            FormStatus::Archived => write!(f, "archived"),
         }
     }
 }
@@ -54,6 +58,7 @@ impl std::str::FromStr for FormStatus {
             "draft" => Ok(FormStatus::Draft),
             "completed" => Ok(FormStatus::Completed),
             "final" => Ok(FormStatus::Final),
+            "archived" => Ok(FormStatus::Archived),
             _ => Err(anyhow::anyhow!("Invalid form status: {}", s)),
         }
     }

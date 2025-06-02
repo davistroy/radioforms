@@ -232,3 +232,89 @@ pub fn validate_business_rules(form_type: &str, form_data: &str) -> Result<(), S
     
     Ok(())
 }
+
+// === FORM LIFECYCLE MANAGEMENT ===
+// Following MANDATORY.md: Simple functions under 20 lines for emergency responders
+
+/// Update form status with simple validation
+/// Valid statuses: draft, completed, final, archived
+pub async fn update_form_status(id: i64, new_status: String) -> Result<(), String> {
+    // Validate status values
+    match new_status.as_str() {
+        "draft" | "completed" | "final" | "archived" => {},
+        _ => return Err(format!("Invalid status: {}. Must be: draft, completed, final, or archived", new_status)),
+    }
+    
+    // Get current status for transition validation
+    let current = sqlx::query("SELECT status FROM forms WHERE id = ?")
+        .bind(id)
+        .fetch_optional(get_db_pool())
+        .await
+        .map_err(|e| format!("Database error: {}", e))?
+        .ok_or("Form not found")?;
+    
+    let current_status: String = current.get("status");
+    
+    // Simple transition validation following MANDATORY.md principles
+    let valid_transition = match (current_status.as_str(), new_status.as_str()) {
+        ("draft", "completed") => true,      // Normal progression
+        ("draft", "final") => true,          // Emergency bypass
+        ("completed", "final") => true,      // Normal progression
+        (_, "archived") => true,             // Archive from any state
+        (current, target) if current == target => true, // Same state
+        _ => false,
+    };
+    
+    if !valid_transition {
+        return Err(format!("Invalid status transition from {} to {}", current_status, new_status));
+    }
+    
+    // Update status
+    sqlx::query("UPDATE forms SET status = ?, updated_at = datetime('now') WHERE id = ?")
+        .bind(new_status)
+        .bind(id)
+        .execute(get_db_pool())
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+    
+    Ok(())
+}
+
+/// Get available status transitions for a form
+pub async fn get_available_transitions(id: i64) -> Result<Vec<String>, String> {
+    let form = sqlx::query("SELECT status FROM forms WHERE id = ?")
+        .bind(id)
+        .fetch_optional(get_db_pool())
+        .await
+        .map_err(|e| format!("Database error: {}", e))?
+        .ok_or("Form not found")?;
+    
+    let status: String = form.get("status");
+    
+    // Simple state machine following MANDATORY.md
+    let transitions = match status.as_str() {
+        "draft" => vec!["completed".to_string(), "final".to_string(), "archived".to_string()],
+        "completed" => vec!["final".to_string(), "archived".to_string()],
+        "final" => vec!["archived".to_string()],
+        "archived" => vec![], // Terminal state
+        _ => vec![],
+    };
+    
+    Ok(transitions)
+}
+
+/// Check if form can be edited based on status
+pub async fn can_edit_form(id: i64) -> Result<bool, String> {
+    let form = sqlx::query("SELECT status FROM forms WHERE id = ?")
+        .bind(id)
+        .fetch_optional(get_db_pool())
+        .await
+        .map_err(|e| format!("Database error: {}", e))?
+        .ok_or("Form not found")?;
+    
+    let status: String = form.get("status");
+    
+    // Simple editing rules
+    let can_edit = matches!(status.as_str(), "draft" | "completed");
+    Ok(can_edit)
+}
