@@ -18,7 +18,7 @@
  * - No complex relationships to maintain simplicity
  */
 
-use sqlx::{FromRow, Type};
+use sqlx::FromRow;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
@@ -186,6 +186,12 @@ pub struct Form {
     
     /// When the form was last modified
     pub updated_at: DateTime<Utc>,
+    
+    /// Version number for form revisions and change tracking
+    pub version: i64,
+    
+    /// Current workflow position for form processing
+    pub workflow_position: Option<String>,
 }
 
 impl Form {

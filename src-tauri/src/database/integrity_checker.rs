@@ -21,7 +21,7 @@
  */
 
 use sqlx::{SqlitePool, Row};
-use anyhow::{Result, Context, anyhow};
+use anyhow::{Result, Context};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

@@ -20,12 +20,12 @@
  * - Recovery mechanisms for failed migrations
  */
 
-use sqlx::{SqlitePool, Row, migrate::MigrateDatabase, Sqlite};
-use std::path::{Path, PathBuf};
+use sqlx::{SqlitePool, Row};
+use std::path::PathBuf;
 use anyhow::{Result, Context, anyhow};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+// use std::collections::HashMap; // Unused
 
 /// Migration metadata and status information.
 /// 

@@ -606,6 +606,17 @@ impl From<SqlxError> for DatabaseError {
     }
 }
 
+impl From<anyhow::Error> for DatabaseError {
+    fn from(err: anyhow::Error) -> Self {
+        DatabaseError::Internal {
+            message: err.to_string(),
+            error_code: Some("ANYHOW_CONVERSION".to_string()),
+            recovery_hint: Some("Check underlying error cause".to_string()),
+            occurred_at: Utc::now(),
+        }
+    }
+}
+
 /// Extracts table name from SQLite constraint error messages.
 fn extract_table_from_constraint(message: &str) -> Option<String> {
     // SQLite error format: "UNIQUE constraint failed: table_name.column_name"

@@ -21,7 +21,7 @@
  * - Performance optimized for 2000+ forms
  */
 
-use sqlx::{SqlitePool, Transaction, Sqlite, Executor};
+use sqlx::{SqlitePool, Transaction, Sqlite};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -254,7 +254,7 @@ impl CrudOperations {
                 .bind(&request.operational_period_start)
                 .bind(&request.operational_period_end)
                 .bind(&request.priority.as_deref().unwrap_or("routine"))
-                .fetch_one(tx)
+                .fetch_one(&mut **tx)
                 .await
                 .context("Failed to create form in database")?;
 
@@ -270,17 +270,18 @@ impl CrudOperations {
                 )
                 .bind(form_id)
                 .bind(&request.preparer_name.as_deref().unwrap_or("system"))
-                .execute(tx)
+                .execute(&mut **tx)
                 .await
                 .context("Failed to create status history entry")?;
 
                 // Fetch and return the created form
                 let form = self.get_form_by_id_tx(tx, form_id).await?
-                    .ok_or_else(|| DatabaseError::internal(
-                        "Failed to retrieve created form",
-                        Some("FORM_RETRIEVAL_FAILED".to_string()),
-                        Some("Check database integrity".to_string())
-                    ))?;
+                    .ok_or_else(|| DatabaseError::Internal {
+                        message: "Failed to retrieve created form".to_string(),
+                        error_code: Some("FORM_RETRIEVAL_FAILED".to_string()),
+                        recovery_hint: Some("Check database integrity".to_string()),
+                        occurred_at: chrono::Utc::now(),
+                    })?;
 
                 Ok(form)
             })
@@ -350,7 +351,7 @@ impl CrudOperations {
 
                 // Validate status transition if requested
                 if let Some(new_status) = &request.status {
-                    if !self.is_valid_status_transition(&current_form.status, new_status)? {
+                    if !self.is_valid_status_transition(&current_form.status, &new_status.to_string())? {
                         return Err(anyhow!(
                             "Invalid status transition from {} to {}", 
                             current_form.status, new_status
@@ -403,8 +404,8 @@ impl CrudOperations {
                     .bind(&current_form.status)
                     .bind(status.to_string())
                     .bind(&request.preparer_name.as_deref().unwrap_or("system"))
-                    .bind(&request.workflow_position.as_deref().unwrap_or(&current_form.workflow_position))
-                    .execute(tx)
+                    .bind(&request.workflow_position.as_deref().unwrap_or(current_form.workflow_position.as_deref().unwrap_or("")))
+                    .execute(&mut **tx)
                     .await
                     .context("Failed to create status history entry")?;
                 }
@@ -453,7 +454,7 @@ impl CrudOperations {
                     sqlx_query = sqlx_query.bind(id);
 
                     sqlx_query
-                        .execute(tx)
+                        .execute(&mut **tx)
                         .await
                         .context("Failed to update form")?;
                 }
@@ -498,7 +499,7 @@ impl CrudOperations {
                     "SELECT COUNT(*) FROM form_relationships WHERE source_form_id = ?1 OR target_form_id = ?1"
                 )
                 .bind(id)
-                .fetch_one(tx)
+                .fetch_one(&mut **tx)
                 .await
                 .context("Failed to check form relationships")?;
 
@@ -514,28 +515,28 @@ impl CrudOperations {
                 // Delete form signatures
                 sqlx::query("DELETE FROM form_signatures WHERE form_id = ?1")
                     .bind(id)
-                    .execute(tx)
+                    .execute(&mut **tx)
                     .await
                     .context("Failed to delete form signatures")?;
 
                 // Delete status history
                 sqlx::query("DELETE FROM form_status_history WHERE form_id = ?1")
                     .bind(id)
-                    .execute(tx)
+                    .execute(&mut **tx)
                     .await
                     .context("Failed to delete status history")?;
 
                 // Delete form relationships
                 sqlx::query("DELETE FROM form_relationships WHERE source_form_id = ?1 OR target_form_id = ?1")
                     .bind(id)
-                    .execute(tx)
+                    .execute(&mut **tx)
                     .await
                     .context("Failed to delete form relationships")?;
 
                 // Finally delete the form itself
                 let result = sqlx::query("DELETE FROM forms WHERE id = ?1")
                     .bind(id)
-                    .execute(tx)
+                    .execute(&mut **tx)
                     .await
                     .context("Failed to delete form from database")?;
 
@@ -693,7 +694,7 @@ impl CrudOperations {
             "#
         )
         .bind(id)
-        .fetch_optional(tx)
+        .fetch_optional(&mut **tx)
         .await
         .context("Failed to fetch form from database")?;
 
@@ -706,7 +707,7 @@ impl CrudOperations {
             "SELECT template_data FROM form_templates WHERE id = ?1 AND is_active = 1"
         )
         .bind(template_id)
-        .fetch_optional(tx)
+        .fetch_optional(&mut **tx)
         .await
         .context("Failed to fetch template data")?;
 

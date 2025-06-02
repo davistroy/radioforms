@@ -20,7 +20,7 @@
  * - Performance monitoring and optimization
  */
 
-use sqlx::{SqlitePool, Transaction, Sqlite, Executor};
+use sqlx::{SqlitePool, Transaction, Sqlite};
 use anyhow::{Result, Context, anyhow};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
