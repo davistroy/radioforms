@@ -73,5 +73,21 @@ export const formService = {
 
   async exportFormICSdes(id: number): Promise<string> {
     return await invoke('export_form_icsdes', { formId: id });
+  },
+
+  async createBackup(backupPath: string): Promise<string> {
+    return await invoke('create_backup', { backupPath });
+  },
+
+  async restoreBackup(backupPath: string): Promise<string> {
+    return await invoke('restore_backup', { backupPath });
+  },
+
+  async listBackups(directoryPath: string): Promise<string[]> {
+    return await invoke('list_backups', { directoryPath });
+  },
+
+  async getBackupInfo(backupPath: string): Promise<string> {
+    return await invoke('get_backup_info', { backupPath });
   }
 };

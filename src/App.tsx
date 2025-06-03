@@ -11,10 +11,11 @@ import { FormList } from "./components/FormList";
 import { FormEditor } from "./components/FormEditor";
 import { FormSearch } from "./components/FormSearch";
 import { ThemeToggle } from "./components/ThemeToggle";
+import { BackupManager } from "./components/BackupManager";
 import type { ICSFormType } from "./types/forms";
 
 function App() {
-  const [currentView, setCurrentView] = useState<'dashboard' | 'list' | 'search' | 'create' | 'edit'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'list' | 'search' | 'create' | 'edit' | 'backup'>('dashboard');
   const [recentForms, setRecentForms] = useState<SimpleForm[]>([]);
   const [editingFormId, setEditingFormId] = useState<number | undefined>();
   const [loading, setLoading] = useState(true);
@@ -137,6 +138,12 @@ function App() {
                 className={`text-sm ${currentView === 'create' ? 'font-semibold' : ''}`}
               >
                 Create
+              </button>
+              <button
+                onClick={() => setCurrentView('backup')}
+                className={`text-sm ${currentView === 'backup' ? 'font-semibold' : ''}`}
+              >
+                Backup
               </button>
               
               <div className="border-l border-border pl-4">
@@ -281,6 +288,10 @@ function App() {
             onSave={handleFormSaved}
             onCancel={() => setCurrentView('dashboard')}
           />
+        )}
+
+        {currentView === 'backup' && (
+          <BackupManager />
         )}
       </main>
     </div>

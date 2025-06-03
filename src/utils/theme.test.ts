@@ -10,8 +10,7 @@ import {
   saveTheme, 
   systemPrefersDark, 
   getEffectiveTheme, 
-  applyTheme,
-  type Theme 
+  applyTheme
 } from './theme';
 
 // Mock localStorage

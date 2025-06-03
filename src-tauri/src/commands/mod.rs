@@ -19,6 +19,7 @@
 
 pub mod simple_commands;
 pub mod export_commands;
+pub mod backup_commands;
 
 #[cfg(test)]
 pub mod integration_tests;
@@ -27,3 +28,5 @@ pub mod integration_tests;
 pub use simple_commands::*;
 // Re-export export commands
 pub use export_commands::*;
+// Re-export backup commands
+pub use backup_commands::*;
