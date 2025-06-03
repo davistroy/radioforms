@@ -143,7 +143,6 @@ test.describe('Emergency Responder Performance Requirements', () => {
     // Check JavaScript heap usage
     const metrics = await page.evaluate(() => {
       if ('memory' in window.performance) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return (window.performance as any).memory;
       }
       return null;

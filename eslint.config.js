@@ -71,6 +71,32 @@ export default [
     },
   },
   
+  // Test files configuration (more relaxed rules)
+  {
+    files: ['**/*.{test,spec}.{ts,tsx}', 'e2e/**/*.{ts,js}'],
+    languageOptions: {
+      parser: tsparser,
+      globals: {
+        test: 'readonly',
+        expect: 'readonly',
+        describe: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        vi: 'readonly',
+        it: 'readonly',
+        console: 'readonly',
+      },
+    },
+    rules: {
+      'no-console': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
+  },
+  
   // Ignore patterns
   {
     ignores: [

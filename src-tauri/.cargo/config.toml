@@ -1,0 +1,18 @@
+# Cargo configuration for faster development builds
+# Following MANDATORY.md: simple optimizations for development speed
+
+[build]
+# Use optimal number of CPU cores for compilation (automatic detection)
+
+# Incremental compilation for faster rebuilds
+incremental = true
+
+# Remove custom linker configurations to avoid compatibility issues
+
+[profile.dev]
+# Split debuginfo to reduce compile time
+split-debuginfo = "unpacked"
+
+[net]
+# Use sparse index for faster dependency resolution
+git-fetch-with-cli = true

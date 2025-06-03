@@ -9,17 +9,26 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
-  fullyParallel: true,
+  fullyParallel: false, // Ensure tests run sequentially to prevent data conflicts
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: 'html',
+  workers: 1, // Single worker to ensure test data isolation
+  reporter: [['html'], ['list']],
+  timeout: 60000, // 60 seconds per test
+  expect: {
+    timeout: 10000, // 10 seconds for assertions
+  },
+  // globalSetup: './e2e/global-setup.ts',
+  // globalTeardown: './e2e/global-teardown.ts',
   
   use: {
     // Test against the development server
     baseURL: 'http://localhost:1420',
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+    actionTimeout: 15000, // 15 seconds for actions
+    navigationTimeout: 30000, // 30 seconds for navigation
   },
 
   projects: [
@@ -43,7 +52,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run tauri dev',
     port: 1420,
-    timeout: 120 * 1000, // 2 minutes for Tauri to start
+    timeout: 300 * 1000, // 5 minutes for first-time Rust compilation
     reuseExistingServer: !process.env.CI,
   },
 });

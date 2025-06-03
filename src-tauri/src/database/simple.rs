@@ -25,16 +25,28 @@ static DB_POOL: OnceLock<SqlitePool> = OnceLock::new();
 
 /// Initialize database with simple schema
 pub async fn init_database(db_path: &str) -> Result<(), String> {
-    let pool = SqlitePool::connect(&format!("sqlite:{}", db_path))
+    // Create database directory if it doesn't exist
+    if let Some(parent) = std::path::Path::new(db_path).parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create database directory: {}", e))?;
+    }
+
+    // Connect with proper SQLite options for better compatibility
+    let connection_string = format!("sqlite:{}?mode=rwc", db_path);
+    let pool = SqlitePool::connect(&connection_string)
         .await
         .map_err(|e| format!("Database connection failed: {}", e))?;
     
+    // Run migrations with better error handling
     sqlx::migrate!()
         .run(&pool)
         .await
         .map_err(|e| format!("Migration failed: {}", e))?;
     
-    DB_POOL.set(pool).map_err(|_| "Database already initialized".to_string())?;
+    // Only set pool if not already initialized (for test environments)
+    if DB_POOL.get().is_none() {
+        DB_POOL.set(pool).map_err(|_| "Database already initialized".to_string())?;
+    }
     
     Ok(())
 }

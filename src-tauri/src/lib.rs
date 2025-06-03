@@ -61,17 +61,26 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .setup(|_app| {
-            // Simple database initialization
+            // Simple database initialization with graceful error handling
             let db_path = "radioforms.db";
-            tauri::async_runtime::block_on(async {
-                if let Err(e) = database::simple::init_database(db_path).await {
-                    log::error!("Failed to initialize database: {}", e);
-                    std::process::exit(1);
+            match tauri::async_runtime::block_on(async {
+                database::simple::init_database(db_path).await
+            }) {
+                Ok(()) => {
+                    log::info!("Database initialized successfully");
+                    log::info!("RadioForms application initialized successfully");
+                    Ok(())
                 }
-            });
-
-            log::info!("RadioForms application initialized successfully");
-            Ok(())
+                Err(e) => {
+                    log::error!("Failed to initialize database: {}", e);
+                    // Return setup error instead of crashing
+                    // Convert String error to std::error::Error
+                    Err(Box::new(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        e
+                    )))
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             save_form, get_form, update_form, 
