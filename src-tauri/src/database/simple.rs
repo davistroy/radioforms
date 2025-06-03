@@ -136,6 +136,73 @@ pub async fn search_forms(incident_name: Option<String>) -> Result<Vec<SimpleFor
     Ok(forms)
 }
 
+/// Advanced search with multiple criteria
+/// Following MANDATORY.md: Simple function for emergency responders
+pub async fn advanced_search(
+    incident_name: Option<String>,
+    form_type: Option<String>,
+    status: Option<String>,
+    date_from: Option<String>,
+    date_to: Option<String>,
+) -> Result<Vec<SimpleForm>, String> {
+    // Build query dynamically but keep it simple
+    let mut query = String::from(
+        "SELECT id, incident_name, form_type, status, form_data, created_at, updated_at 
+         FROM forms WHERE 1=1"
+    );
+    let mut params: Vec<String> = Vec::new();
+    
+    if let Some(name) = incident_name {
+        query.push_str(" AND incident_name LIKE ?");
+        params.push(format!("%{}%", name));
+    }
+    
+    if let Some(ftype) = form_type {
+        query.push_str(" AND form_type = ?");
+        params.push(ftype);
+    }
+    
+    if let Some(st) = status {
+        query.push_str(" AND status = ?");
+        params.push(st);
+    }
+    
+    if let Some(from) = date_from {
+        query.push_str(" AND created_at >= ?");
+        params.push(from);
+    }
+    
+    if let Some(to) = date_to {
+        query.push_str(" AND created_at <= ?");
+        params.push(to);
+    }
+    
+    query.push_str(" ORDER BY created_at DESC LIMIT 100");
+    
+    // Execute with dynamic params
+    let mut sql_query = sqlx::query(&query);
+    for param in params {
+        sql_query = sql_query.bind(param);
+    }
+    
+    let rows = sql_query
+        .fetch_all(get_db_pool())
+        .await
+        .map_err(|e| format!("Advanced search failed: {}", e))?;
+    
+    let forms = rows.into_iter().map(|r| SimpleForm {
+        id: r.get("id"),
+        incident_name: r.get("incident_name"),
+        form_type: r.get("form_type"),
+        status: r.get("status"),
+        form_data: r.get("form_data"),
+        created_at: r.get("created_at"),
+        updated_at: r.get("updated_at"),
+    }).collect();
+    
+    Ok(forms)
+}
+
 /// List all forms
 pub async fn list_all_forms() -> Result<Vec<SimpleForm>, String> {
     let rows = sqlx::query(

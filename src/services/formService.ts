@@ -41,5 +41,21 @@ export const formService = {
 
   async deleteForm(id: number): Promise<boolean> {
     return await invoke('delete_form', { id });
+  },
+
+  async advancedSearch(
+    incidentName?: string,
+    formType?: string,
+    status?: string,
+    dateFrom?: string,
+    dateTo?: string
+  ): Promise<SimpleForm[]> {
+    return await invoke('advanced_search', {
+      incidentName,
+      formType,
+      status,
+      dateFrom,
+      dateTo
+    });
   }
 };

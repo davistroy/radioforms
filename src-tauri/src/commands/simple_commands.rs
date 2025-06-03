@@ -28,6 +28,17 @@ pub async fn search_forms(incident_name: Option<String>) -> Result<Vec<SimpleFor
 }
 
 #[tauri::command]
+pub async fn advanced_search(
+    incident_name: Option<String>,
+    form_type: Option<String>,
+    status: Option<String>,
+    date_from: Option<String>,
+    date_to: Option<String>,
+) -> Result<Vec<SimpleForm>, String> {
+    simple::advanced_search(incident_name, form_type, status, date_from, date_to).await
+}
+
+#[tauri::command]
 pub async fn get_all_forms() -> Result<Vec<SimpleForm>, String> {
     simple::list_all_forms().await
 }
