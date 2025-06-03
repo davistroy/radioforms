@@ -125,6 +125,56 @@ export function FormEditor({ formId, onSave, onCancel }: FormEditorProps) {
     }
   };
 
+  const handleExportJSON = async () => {
+    if (!formId) {
+      setError('Cannot export unsaved form. Please save first.');
+      return;
+    }
+
+    try {
+      setError('');
+      const jsonData = await formService.exportFormJSON(formId);
+      
+      // Create download link
+      const blob = new Blob([jsonData], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `form-${formId}-export.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export JSON');
+    }
+  };
+
+  const handleExportICSdes = async () => {
+    if (!formId) {
+      setError('Cannot export unsaved form. Please save first.');
+      return;
+    }
+
+    try {
+      setError('');
+      const icsdesData = await formService.exportFormICSdes(formId);
+      
+      // Create download link
+      const blob = new Blob([icsdesData], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `form-${formId}-radio.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export ICS-DES');
+    }
+  };
+
   if (initialLoading) {
     return <div className="text-center py-4">Loading form...</div>;
   }
@@ -239,13 +289,31 @@ export function FormEditor({ formId, onSave, onCancel }: FormEditorProps) {
           </button>
           
           {formId && (
-            <button
-              type="button"
-              onClick={handleExportPDF}
-              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-            >
-              Export PDF
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={handleExportPDF}
+                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+              >
+                Export PDF
+              </button>
+              
+              <button
+                type="button"
+                onClick={handleExportJSON}
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+              >
+                Export JSON
+              </button>
+              
+              <button
+                type="button"
+                onClick={handleExportICSdes}
+                className="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700"
+              >
+                Radio Format
+              </button>
+            </>
           )}
           
           {onCancel && (

@@ -55,17 +55,6 @@
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   }
 
-  /* Dark mode support */
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --color-bg-primary: #0f172a;
-      --color-bg-secondary: #1e293b;
-      --color-text-primary: #f8fafc;
-      --color-text-secondary: #cbd5e1;
-      --color-border: #334155;
-    }
-  }
-
   /* Light mode (default) */
   :root {
     --color-bg-primary: #ffffff;
@@ -75,13 +64,36 @@
     --color-border: #e2e8f0;
   }
 
+  /* Dark mode support */
+  :root.dark {
+    --color-bg-primary: #0f172a;
+    --color-bg-secondary: #1e293b;
+    --color-text-primary: #f8fafc;
+    --color-text-secondary: #cbd5e1;
+    --color-border: #334155;
+  }
+
+  /* System preference dark mode (when no manual selection) */
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light):not(.dark) {
+      --color-bg-primary: #0f172a;
+      --color-bg-secondary: #1e293b;
+      --color-text-primary: #f8fafc;
+      --color-text-secondary: #cbd5e1;
+      --color-border: #334155;
+    }
+  }
+
   * {
     @apply border-border;
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
   }
 
   body {
     font-family: var(--font-family-sans);
     @apply bg-background text-foreground antialiased;
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-primary);
   }
 
   html {

@@ -86,6 +86,7 @@ pub fn run() {
             save_form, get_form, update_form, 
             search_forms, advanced_search, get_all_forms, delete_form,
             update_form_status, get_available_transitions, can_edit_form,
+            export_forms_json, export_form_json, import_forms_json, export_form_icsdes,
             greet
         ])
         .run(tauri::generate_context!())

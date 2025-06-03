@@ -196,4 +196,87 @@ describe('FormService', () => {
       expect(result).toBe(false);
     });
   });
+
+  describe('JSON Export/Import', () => {
+    it('should export all forms to JSON', async () => {
+      // Arrange
+      const mockExportData = JSON.stringify({
+        metadata: {
+          version: '1.0.0',
+          exported_at: '2025-01-01T00:00:00Z',
+          form_count: 2
+        },
+        forms: [
+          { 
+            id: 1, 
+            incident_name: 'Test 1', 
+            form_type: 'ICS-201', 
+            form_data: '{}', 
+            status: 'draft', 
+            created_at: '2025-01-01T00:00:00Z', 
+            updated_at: '2025-01-01T00:00:00Z' 
+          }
+        ]
+      }, null, 2);
+      mockInvoke.mockResolvedValue(mockExportData);
+
+      // Act
+      const result = await formService.exportFormsJSON();
+
+      // Assert
+      expect(mockInvoke).toHaveBeenCalledWith('export_forms_json');
+      expect(result).toBe(mockExportData);
+    });
+
+    it('should export single form to JSON', async () => {
+      // Arrange
+      const mockFormData = JSON.stringify({
+        id: 1,
+        incident_name: 'Test Incident',
+        form_type: 'ICS-201',
+        form_data: '{"test": "data"}',
+        status: 'draft',
+        created_at: '2025-01-01T00:00:00Z',
+        updated_at: '2025-01-01T00:00:00Z'
+      }, null, 2);
+      mockInvoke.mockResolvedValue(mockFormData);
+
+      // Act
+      const result = await formService.exportFormJSON(1);
+
+      // Assert
+      expect(mockInvoke).toHaveBeenCalledWith('export_form_json', { formId: 1 });
+      expect(result).toBe(mockFormData);
+    });
+
+    it('should import forms from JSON', async () => {
+      // Arrange
+      const importData = JSON.stringify({
+        metadata: {
+          version: '1.0.0',
+          exported_at: '2025-01-01T00:00:00Z',
+          form_count: 2
+        },
+        forms: [
+          { 
+            id: 1, 
+            incident_name: 'Test 1', 
+            form_type: 'ICS-201', 
+            form_data: '{}', 
+            status: 'draft', 
+            created_at: '', 
+            updated_at: '' 
+          }
+        ]
+      });
+      mockInvoke.mockResolvedValue('Successfully imported 1 forms');
+
+      // Act
+      const result = await formService.importFormsJSON(importData);
+
+      // Assert
+      expect(mockInvoke).toHaveBeenCalledWith('import_forms_json', { jsonData: importData });
+      expect(result).toBe('Successfully imported 1 forms');
+    });
+  });
 });

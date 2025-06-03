@@ -57,5 +57,21 @@ export const formService = {
       dateFrom,
       dateTo
     });
+  },
+
+  async exportFormsJSON(): Promise<string> {
+    return await invoke('export_forms_json');
+  },
+
+  async exportFormJSON(id: number): Promise<string> {
+    return await invoke('export_form_json', { formId: id });
+  },
+
+  async importFormsJSON(jsonData: string): Promise<string> {
+    return await invoke('import_forms_json', { jsonData });
+  },
+
+  async exportFormICSdes(id: number): Promise<string> {
+    return await invoke('export_form_icsdes', { formId: id });
   }
 };

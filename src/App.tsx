@@ -10,6 +10,7 @@ import { getAvailableFormTypes } from "./templates";
 import { FormList } from "./components/FormList";
 import { FormEditor } from "./components/FormEditor";
 import { FormSearch } from "./components/FormSearch";
+import { ThemeToggle } from "./components/ThemeToggle";
 import type { ICSFormType } from "./types/forms";
 
 function App() {
@@ -137,6 +138,10 @@ function App() {
               >
                 Create
               </button>
+              
+              <div className="border-l border-border pl-4">
+                <ThemeToggle />
+              </div>
             </nav>
           </div>
         </div>
