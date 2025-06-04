@@ -38,6 +38,7 @@ export default [
         
         // TypeScript types
         HTMLElement: 'readonly',
+        HTMLInputElement: 'readonly',
         Element: 'readonly',
         Event: 'readonly',
       },

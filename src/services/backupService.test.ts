@@ -4,7 +4,7 @@
  * Following MANDATORY.md: Basic tests for backup functionality.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { formService } from './formService';
 
 // Mock Tauri invoke

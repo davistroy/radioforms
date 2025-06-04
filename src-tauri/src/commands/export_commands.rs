@@ -44,9 +44,8 @@ pub async fn export_forms_json(
 ) -> Result<String, String> {
     let pool = get_pool().await?;
     
-    // Get all forms from database
-    let forms = sqlx::query_as!(
-        FormExport,
+    // Get all forms from database - OPTIMIZED: Use simple query instead of macro
+    let rows = sqlx::query(
         "SELECT id, incident_name, form_type, form_data, status, created_at, updated_at 
          FROM forms 
          ORDER BY created_at DESC"
@@ -54,6 +53,16 @@ pub async fn export_forms_json(
     .fetch_all(&pool)
     .await
     .map_err(|e| format!("Failed to fetch forms: {}", e))?;
+    
+    let forms: Vec<FormExport> = rows.into_iter().map(|row| FormExport {
+        id: row.get("id"),
+        incident_name: row.get("incident_name"),
+        form_type: row.get("form_type"),
+        form_data: row.get("form_data"),
+        status: row.get("status"),
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
+    }).collect();
     
     // Create export data with metadata
     let export_data = FormsExportData {
@@ -78,17 +87,26 @@ pub async fn export_form_json(
 ) -> Result<String, String> {
     let pool = get_pool().await?;
     
-    // Get specific form from database
-    let form = sqlx::query_as!(
-        FormExport,
+    // Get specific form from database - OPTIMIZED: Use simple query instead of macro
+    let row = sqlx::query(
         "SELECT id, incident_name, form_type, form_data, status, created_at, updated_at 
          FROM forms 
          WHERE id = ?"
-        , form_id
     )
+    .bind(form_id)
     .fetch_one(&pool)
     .await
     .map_err(|e| format!("Form not found: {}", e))?;
+    
+    let form = FormExport {
+        id: row.get("id"),
+        incident_name: row.get("incident_name"),
+        form_type: row.get("form_type"),
+        form_data: row.get("form_data"),
+        status: row.get("status"),
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
+    };
     
     // Convert to JSON
     serde_json::to_string_pretty(&form)
@@ -115,26 +133,26 @@ pub async fn import_forms_json(
     
     // Import each form
     for form in import_data.forms {
-        // Check if form with same incident name and type already exists
-        let exists = sqlx::query_scalar!(
-            "SELECT COUNT(*) FROM forms WHERE incident_name = ? AND form_type = ?",
-            form.incident_name,
-            form.form_type
+        // Check if form with same incident name and type already exists - OPTIMIZED: Use simple query
+        let exists: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM forms WHERE incident_name = ? AND form_type = ?"
         )
+        .bind(&form.incident_name)
+        .bind(&form.form_type)
         .fetch_one(&pool)
         .await
         .map_err(|e| format!("Failed to check existing form: {}", e))?;
         
         if exists == 0 {
-            // Insert new form
-            sqlx::query!(
+            // Insert new form - OPTIMIZED: Use simple query instead of macro
+            sqlx::query(
                 "INSERT INTO forms (incident_name, form_type, form_data, status) 
-                 VALUES (?, ?, ?, ?)",
-                form.incident_name,
-                form.form_type,
-                form.form_data,
-                form.status
+                 VALUES (?, ?, ?, ?)"
             )
+            .bind(&form.incident_name)
+            .bind(&form.form_type)
+            .bind(&form.form_data)
+            .bind(&form.status)
             .execute(&pool)
             .await
             .map_err(|e| format!("Failed to import form: {}", e))?;
@@ -154,21 +172,27 @@ pub async fn export_form_icsdes(
 ) -> Result<String, String> {
     let pool = get_pool().await?;
     
-    // Get form from database
-    let form = sqlx::query!(
-        "SELECT incident_name, form_type, form_data, created_at FROM forms WHERE id = ?",
-        form_id
+    // Get form from database - OPTIMIZED: Use simple query instead of macro
+    let row = sqlx::query(
+        "SELECT incident_name, form_type, form_data, created_at FROM forms WHERE id = ?"
     )
+    .bind(form_id)
     .fetch_one(&pool)
     .await
     .map_err(|e| format!("Form not found: {}", e))?;
     
+    // Extract values from row
+    let incident_name: String = row.get("incident_name");
+    let form_type: String = row.get("form_type");
+    let form_data_str: String = row.get("form_data");
+    let created_at: String = row.get("created_at");
+    
     // Parse form data
-    let form_data: serde_json::Value = serde_json::from_str(&form.form_data)
+    let form_data: serde_json::Value = serde_json::from_str(&form_data_str)
         .map_err(|e| format!("Invalid form data: {}", e))?;
     
     // Simple ICS-DES encoding based on form type
-    let icsdes = match form.form_type.as_str() {
+    let icsdes = match form_type.as_str() {
         "ICS-213" => {
             // Extract fields from form data
             let to = form_data.get("to")
@@ -182,8 +206,8 @@ pub async fn export_form_icsdes(
                 .unwrap_or("No message");
             
             // Format date and time
-            let date = form.created_at[0..10].replace("-", "");
-            let time = form.created_at[11..16].replace(":", "");
+            let date = created_at[0..10].replace("-", "");
+            let time = created_at[11..16].replace(":", "");
             
             // Escape special characters
             let message_escaped = message
@@ -206,13 +230,13 @@ pub async fn export_form_icsdes(
                 .unwrap_or("Unknown");
             
             format!("201{{1~{}|5~{}|11~{}}}", 
-                form.incident_name, incident_number, prepared_by)
+                incident_name, incident_number, prepared_by)
         },
         _ => {
             // Generic encoding for other forms
             format!("{}{{1~{}}}", 
-                form.form_type.replace("ICS-", ""), 
-                form.incident_name)
+                form_type.replace("ICS-", ""), 
+                incident_name)
         }
     };
     

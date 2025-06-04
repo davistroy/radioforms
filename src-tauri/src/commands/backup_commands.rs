@@ -29,8 +29,8 @@ pub async fn create_backup(
 ) -> Result<String, String> {
     let pool = get_pool().await?;
     
-    // Get form count for metadata
-    let form_count = sqlx::query_scalar!("SELECT COUNT(*) FROM forms")
+    // Get form count for metadata - OPTIMIZED: Use simple query instead of macro
+    let form_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM forms")
         .fetch_one(&pool)
         .await
         .map_err(|e| format!("Failed to count forms: {}", e))?;

@@ -136,15 +136,15 @@ export function FormEditor({ formId, onSave, onCancel }: FormEditorProps) {
       const jsonData = await formService.exportFormJSON(formId);
       
       // Create download link
-      const blob = new Blob([jsonData], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
+      const blob = new window.Blob([jsonData], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `form-${formId}-export.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(url);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to export JSON');
     }
@@ -161,15 +161,15 @@ export function FormEditor({ formId, onSave, onCancel }: FormEditorProps) {
       const icsdesData = await formService.exportFormICSdes(formId);
       
       // Create download link
-      const blob = new Blob([icsdesData], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
+      const blob = new window.Blob([icsdesData], { type: 'text/plain' });
+      const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `form-${formId}-radio.txt`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(url);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to export ICS-DES');
     }

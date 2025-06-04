@@ -16,7 +16,7 @@ export function getStoredTheme(): Theme {
     if (stored === 'light' || stored === 'dark' || stored === 'system') {
       return stored;
     }
-  } catch (error) {
+  } catch {
     // localStorage might not be available
     console.warn('Could not access localStorage for theme');
   }
@@ -29,7 +29,7 @@ export function getStoredTheme(): Theme {
 export function saveTheme(theme: Theme): void {
   try {
     localStorage.setItem('radioforms-theme', theme);
-  } catch (error) {
+  } catch {
     console.warn('Could not save theme to localStorage');
   }
 }

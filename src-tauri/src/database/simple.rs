@@ -56,6 +56,11 @@ fn get_db_pool() -> &'static SqlitePool {
     DB_POOL.get().expect("Database not initialized")
 }
 
+/// Public API for getting database pool (used by commands)
+pub async fn get_pool() -> Result<&'static SqlitePool, String> {
+    Ok(get_db_pool())
+}
+
 /// Save form data with validation
 pub async fn save_form(incident_name: String, form_type: String, data: String) -> Result<i64, String> {
     // Apply all validation rules
@@ -64,7 +69,8 @@ pub async fn save_form(incident_name: String, form_type: String, data: String) -
     validate_form_data_json(&data)?;
     validate_business_rules(&form_type, &data)?;
     
-    let id = sqlx::query_scalar::<_, i64>(
+    // OPTIMIZED: Use simple query instead of macro
+    let row = sqlx::query(
         "INSERT INTO forms (incident_name, form_type, form_data, created_at, updated_at) 
          VALUES (?, ?, ?, datetime('now'), datetime('now')) 
          RETURNING id"
@@ -75,6 +81,8 @@ pub async fn save_form(incident_name: String, form_type: String, data: String) -
     .fetch_one(get_db_pool())
     .await
     .map_err(|e| format!("Failed to save form: {}", e))?;
+    
+    let id: i64 = row.get("id");
     
     Ok(id)
 }

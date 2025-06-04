@@ -22,15 +22,15 @@ export function ExportImport() {
       const jsonData = await formService.exportFormsJSON();
       
       // Create download link
-      const blob = new Blob([jsonData], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
+      const blob = new window.Blob([jsonData], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `radioforms-export-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(url);
       
       setMessage('Forms exported successfully');
     } catch (err) {

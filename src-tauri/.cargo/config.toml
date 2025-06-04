@@ -1,18 +1,11 @@
-# Cargo configuration for faster development builds
-# Following MANDATORY.md: simple optimizations for development speed
-
+# OPTIMIZED: Build configuration for faster compilation
 [build]
-# Use optimal number of CPU cores for compilation (automatic detection)
-
-# Incremental compilation for faster rebuilds
 incremental = true
+jobs = 8  # Increase parallelism
 
-# Remove custom linker configurations to avoid compatibility issues
+# Optimize target selection for current platform
+[target."cfg(windows)"]
+rustflags = ["-C", "target-cpu=native"]
 
-[profile.dev]
-# Split debuginfo to reduce compile time
-split-debuginfo = "unpacked"
-
-[net]
-# Use sparse index for faster dependency resolution
-git-fetch-with-cli = true
+[target."cfg(unix)"]
+rustflags = ["-C", "target-cpu=native"]
