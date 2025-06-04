@@ -5,8 +5,7 @@
  * No complex enterprise backup patterns - just working data protection.
  */
 
-use tauri::State;
-use crate::database::simple::{get_pool, DatabaseState};
+use crate::database::simple::get_pool;
 use std::path::Path;
 use std::fs;
 use chrono::{DateTime, Utc};
@@ -23,15 +22,12 @@ struct BackupMetadata {
 
 /// Create a manual backup to specified location
 #[tauri::command]
-pub async fn create_backup(
-    backup_path: String,
-    _state: State<'_, DatabaseState>
-) -> Result<String, String> {
+pub async fn create_backup(backup_path: String) -> Result<String, String> {
     let pool = get_pool().await?;
     
     // Get form count for metadata - OPTIMIZED: Use simple query instead of macro
     let form_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM forms")
-        .fetch_one(&pool)
+        .fetch_one(pool)
         .await
         .map_err(|e| format!("Failed to count forms: {}", e))?;
     
@@ -72,10 +68,7 @@ pub async fn create_backup(
 
 /// Restore database from backup file
 #[tauri::command]
-pub async fn restore_backup(
-    backup_path: String,
-    _state: State<'_, DatabaseState>
-) -> Result<String, String> {
+pub async fn restore_backup(backup_path: String) -> Result<String, String> {
     // Check if backup file exists
     if !Path::new(&backup_path).exists() {
         return Err("Backup file not found".to_string());

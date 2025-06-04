@@ -5,9 +5,9 @@
  * No complex schemas or enterprise patterns - just working data exchange.
  */
 
-use tauri::State;
-use crate::database::simple::{get_pool, DatabaseState};
+use crate::database::simple::get_pool;
 use serde::{Serialize, Deserialize};
+use sqlx::Row;
 use chrono::{DateTime, Utc};
 
 /// Simple form export structure - matches database schema
@@ -39,9 +39,7 @@ struct FormsExportData {
 
 /// Export all forms to JSON format
 #[tauri::command]
-pub async fn export_forms_json(
-    _state: State<'_, DatabaseState>
-) -> Result<String, String> {
+pub async fn export_forms_json() -> Result<String, String> {
     let pool = get_pool().await?;
     
     // Get all forms from database - OPTIMIZED: Use simple query instead of macro
@@ -50,7 +48,7 @@ pub async fn export_forms_json(
          FROM forms 
          ORDER BY created_at DESC"
     )
-    .fetch_all(&pool)
+    .fetch_all(pool)
     .await
     .map_err(|e| format!("Failed to fetch forms: {}", e))?;
     
@@ -81,10 +79,7 @@ pub async fn export_forms_json(
 
 /// Export single form to JSON format
 #[tauri::command]
-pub async fn export_form_json(
-    form_id: i64,
-    _state: State<'_, DatabaseState>
-) -> Result<String, String> {
+pub async fn export_form_json(form_id: i64) -> Result<String, String> {
     let pool = get_pool().await?;
     
     // Get specific form from database - OPTIMIZED: Use simple query instead of macro
@@ -94,7 +89,7 @@ pub async fn export_form_json(
          WHERE id = ?"
     )
     .bind(form_id)
-    .fetch_one(&pool)
+    .fetch_one(pool)
     .await
     .map_err(|e| format!("Form not found: {}", e))?;
     
@@ -115,10 +110,7 @@ pub async fn export_form_json(
 
 /// Import forms from JSON data
 #[tauri::command]
-pub async fn import_forms_json(
-    json_data: String,
-    _state: State<'_, DatabaseState>
-) -> Result<String, String> {
+pub async fn import_forms_json(json_data: String) -> Result<String, String> {
     // Parse JSON data
     let import_data: FormsExportData = serde_json::from_str(&json_data)
         .map_err(|e| format!("Invalid JSON format: {}", e))?;
@@ -139,7 +131,7 @@ pub async fn import_forms_json(
         )
         .bind(&form.incident_name)
         .bind(&form.form_type)
-        .fetch_one(&pool)
+        .fetch_one(pool)
         .await
         .map_err(|e| format!("Failed to check existing form: {}", e))?;
         
@@ -153,7 +145,7 @@ pub async fn import_forms_json(
             .bind(&form.form_type)
             .bind(&form.form_data)
             .bind(&form.status)
-            .execute(&pool)
+            .execute(pool)
             .await
             .map_err(|e| format!("Failed to import form: {}", e))?;
             
@@ -166,10 +158,7 @@ pub async fn import_forms_json(
 
 /// Export form to ICS-DES radio format (simplified implementation)
 #[tauri::command]
-pub async fn export_form_icsdes(
-    form_id: i64,
-    _state: State<'_, DatabaseState>
-) -> Result<String, String> {
+pub async fn export_form_icsdes(form_id: i64) -> Result<String, String> {
     let pool = get_pool().await?;
     
     // Get form from database - OPTIMIZED: Use simple query instead of macro
@@ -177,7 +166,7 @@ pub async fn export_form_icsdes(
         "SELECT incident_name, form_type, form_data, created_at FROM forms WHERE id = ?"
     )
     .bind(form_id)
-    .fetch_one(&pool)
+    .fetch_one(pool)
     .await
     .map_err(|e| format!("Form not found: {}", e))?;
     
