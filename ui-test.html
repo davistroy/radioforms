@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RadioForms UI Test - Enterprise Design System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Enterprise UI Design System v2.0 - Color Palette */
+        :root {
+            --color-primary: #71639e;
+            --color-primary-hover: #5d5184;
+            --color-secondary: #714B67;
+            --color-success: #28a745;
+            --color-danger: #dc3545;
+            --color-warning: #ffac00;
+            --color-info: #17a2b8;
+            
+            /* Gray scale for text and UI elements */
+            --gray-50: #f8fafc;
+            --gray-100: #f1f5f9;
+            --gray-200: #e2e8f0;
+            --gray-300: #cbd5e1;
+            --gray-400: #adb5bd;
+            --gray-500: #8b92a9;
+            --gray-600: #6c757d;
+            --gray-700: #495057;
+            --gray-800: #343a40;
+            --gray-900: #212529;
+
+            /* Enterprise Typography System */
+            --font-system: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --font-mono: SFMono-Regular, Menlo, Monaco, monospace;
+            
+            /* 8px Grid Spacing System (Enterprise UI Spec) */
+            --space-1: 8px;
+            --space-2: 16px;
+            --space-3: 24px;
+            --space-4: 32px;
+            --space-5: 40px;
+            --space-6: 48px;
+            
+            /* Enterprise Shadow System */
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+            
+            /* Focus Ring (Enterprise Standard) */
+            --focus-ring: 0 0 0 2px rgba(113, 99, 158, 0.5);
+
+            /* Light mode (Enterprise UI Spec) */
+            --background: #ffffff;
+            --foreground: var(--gray-900);
+            --card: #ffffff;
+            --card-foreground: var(--gray-900);
+            --primary: var(--color-primary);
+            --primary-foreground: #ffffff;
+            --secondary: var(--gray-100);
+            --secondary-foreground: var(--gray-900);
+            --muted: var(--gray-100);
+            --muted-foreground: var(--gray-500);
+            --accent: var(--gray-100);
+            --accent-foreground: var(--gray-900);
+            --destructive: var(--color-danger);
+            --destructive-foreground: #ffffff;
+            --border: var(--gray-200);
+            --input: var(--gray-200);
+            --ring: var(--color-primary);
+        }
+
+        body {
+            font-family: var(--font-system);
+            background-color: var(--background);
+            color: var(--foreground);
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+        }
+
+        /* Enterprise Button System */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            letter-spacing: 0.025em;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-sm);
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .btn:focus-visible {
+            outline: none;
+            box-shadow: var(--focus-ring);
+        }
+
+        .btn-primary {
+            background-color: var(--color-primary);
+            color: white;
+            height: 40px;
+            padding: 0 var(--space-3);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--color-primary-hover);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-1px);
+        }
+
+        .btn-outline {
+            border: 1px solid var(--border);
+            background-color: transparent;
+            color: var(--foreground);
+            height: 40px;
+            padding: 0 var(--space-3);
+        }
+
+        .btn-outline:hover {
+            background-color: var(--accent);
+            box-shadow: var(--shadow-md);
+        }
+
+        /* Enterprise Card System */
+        .card {
+            background-color: var(--card);
+            color: var(--card-foreground);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: var(--shadow-sm);
+            transition: all 0.2s ease;
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-md);
+        }
+
+        .card-header {
+            padding: var(--space-3);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--foreground);
+            margin: 0 0 var(--space-1) 0;
+            line-height: 1.5;
+        }
+
+        .card-description {
+            font-size: 0.875rem;
+            color: var(--muted-foreground);
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        .card-content {
+            padding: var(--space-3);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 9999px;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-badge-draft {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-badge-completed {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 var(--space-2);
+        }
+
+        .text-gradient {
+            background: linear-gradient(to right, var(--color-primary), var(--color-primary-hover));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .grid {
+            display: grid;
+            gap: var(--space-4);
+        }
+
+        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+        .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+        .space-y-4 > * + * { margin-top: var(--space-2); }
+        .space-y-6 > * + * { margin-top: var(--space-3); }
+
+        .flex { display: flex; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .space-x-4 > * + * { margin-left: var(--space-2); }
+
+        .h-16 { height: 4rem; }
+        .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
+        .mb-6 { margin-bottom: var(--space-3); }
+        .mb-8 { margin-bottom: var(--space-4); }
+
+        .text-2xl { font-size: 1.5rem; line-height: 2rem; }
+        .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+        .font-bold { font-weight: 700; }
+        .font-semibold { font-weight: 600; }
+
+        .border-b { border-bottom: 1px solid var(--border); }
+        .bg-white { background-color: white; }
+
+        @media (min-width: 768px) {
+            .md\\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+
+        @media (min-width: 1024px) {
+            .lg\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            .lg\\:col-span-2 { grid-column: span 2 / span 2; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="border-b bg-white">
+        <div class="container">
+            <div class="flex h-16 items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <h1 class="text-2xl font-bold text-gradient">RadioForms</h1>
+                    <span style="font-size: 0.875rem; color: var(--muted-foreground);">
+                        ICS Forms Management
+                    </span>
+                </div>
+                
+                <nav class="flex items-center space-x-4">
+                    <button class="btn btn-outline">Dashboard</button>
+                    <button class="btn btn-outline">All Forms</button>
+                    <button class="btn btn-outline">Search</button>
+                    <button class="btn btn-primary">Create</button>
+                    <button class="btn btn-outline">Backup</button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container py-8">
+        <h2 class="text-xl font-bold mb-6">Dashboard</h2>
+        
+        <!-- Quick Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <div class="card">
+                <div class="card-content">
+                    <div style="font-size: 1.5rem; font-weight: 700; line-height: 2rem;">3</div>
+                    <p style="font-size: 0.75rem; color: var(--muted-foreground);">Recent Forms</p>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-content">
+                    <div style="font-size: 1.5rem; font-weight: 700; line-height: 2rem;">3</div>
+                    <p style="font-size: 0.75rem; color: var(--muted-foreground);">Form Types Available</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Recent Forms -->
+            <div class="lg:col-span-2">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Recent Forms</h2>
+                        <p class="card-description">
+                            Your most recently updated forms
+                        </p>
+                    </div>
+                    <div class="card-content space-y-4">
+                        <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-2); border: 1px solid var(--border); border-radius: 8px;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                    <span style="font-weight: 500;">ICS-201</span>
+                                    <span class="status-badge status-badge-draft">
+                                        Draft
+                                    </span>
+                                </div>
+                                <p style="font-size: 0.875rem; color: var(--muted-foreground); margin: var(--space-1) 0 0 0;">
+                                    Emergency Response Incident
+                                </p>
+                                <p style="font-size: 0.75rem; color: var(--muted-foreground); margin: 0;">
+                                    Updated: 12/4/2025
+                                </p>
+                            </div>
+                            <div style="display: flex; gap: var(--space-1);">
+                                <button class="btn btn-outline" style="height: 32px; padding: 0 var(--space-2); font-size: 0.75rem;">
+                                    Edit
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-2); border: 1px solid var(--border); border-radius: 8px;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                    <span style="font-weight: 500;">ICS-213</span>
+                                    <span class="status-badge status-badge-completed">
+                                        Completed
+                                    </span>
+                                </div>
+                                <p style="font-size: 0.875rem; color: var(--muted-foreground); margin: var(--space-1) 0 0 0;">
+                                    Communications Log
+                                </p>
+                                <p style="font-size: 0.75rem; color: var(--muted-foreground); margin: 0;">
+                                    Updated: 12/3/2025
+                                </p>
+                            </div>
+                            <div style="display: flex; gap: var(--space-1);">
+                                <button class="btn btn-outline" style="height: 32px; padding: 0 var(--space-2); font-size: 0.75rem;">
+                                    Edit
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div>
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Quick Actions</h2>
+                        <p class="card-description">
+                            Create new forms and manage data
+                        </p>
+                    </div>
+                    <div class="card-content space-y-4">
+                        <div>
+                            <h3 style="font-weight: 500; margin-bottom: var(--space-2);">Create New Form</h3>
+                            <div class="space-y-6">
+                                <button class="btn btn-outline" style="width: 100%; justify-content: flex-start;">
+                                    ICS-201
+                                </button>
+                                <button class="btn btn-outline" style="width: 100%; justify-content: flex-start;">
+                                    ICS-202
+                                </button>
+                                <button class="btn btn-outline" style="width: 100%; justify-content: flex-start;">
+                                    ICS-213
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
