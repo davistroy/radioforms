@@ -8,31 +8,56 @@ export default {
   theme: {
     extend: {
       colors: {
+        border: "var(--border)",
+        input: "var(--input)",
+        ring: "var(--ring)",
+        background: "var(--background)",
+        foreground: "var(--foreground)",
         primary: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
+          DEFAULT: "var(--primary)",
+          foreground: "var(--primary-foreground)",
         },
-        background: 'var(--color-bg-primary)',
-        foreground: 'var(--color-text-primary)',
+        secondary: {
+          DEFAULT: "var(--secondary)",
+          foreground: "var(--secondary-foreground)",
+        },
+        destructive: {
+          DEFAULT: "var(--destructive)",
+          foreground: "var(--destructive-foreground)",
+        },
         muted: {
-          foreground: 'var(--color-text-secondary)',
+          DEFAULT: "var(--muted)",
+          foreground: "var(--muted-foreground)",
         },
-        border: 'var(--color-border)',
+        accent: {
+          DEFAULT: "var(--accent)",
+          foreground: "var(--accent-foreground)",
+        },
+        popover: {
+          DEFAULT: "var(--popover)",
+          foreground: "var(--popover-foreground)",
+        },
         card: {
-          DEFAULT: 'var(--color-bg-secondary)',
-          foreground: 'var(--color-text-primary)',
+          DEFAULT: "var(--card)",
+          foreground: "var(--card-foreground)",
         },
       },
+      spacing: {
+        '1': 'var(--space-1)',
+        '2': 'var(--space-2)',
+        '3': 'var(--space-3)',
+        '4': 'var(--space-4)',
+        '5': 'var(--space-5)',
+        '6': 'var(--space-6)',
+      },
       fontFamily: {
-        sans: ['Inter', 'ui-sans-serif', 'system-ui'],
+        sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
+        mono: ['SFMono-Regular', 'Menlo', 'Monaco', 'monospace'],
+      },
+      boxShadow: {
+        'sm': 'var(--shadow-sm)',
+        'md': 'var(--shadow-md)',
+        'lg': 'var(--shadow-lg)',
       },
     },
   },
