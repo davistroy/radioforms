@@ -82,7 +82,7 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      # Build the Tauri application
+      # Build the Tauri application  
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -90,6 +90,12 @@ jobs:
           RUST_BACKTRACE: 1
         with:
           args: ${{ matrix.args }}
+          # Don't create releases automatically in this workflow
+          tagName: ""
+          releaseName: ""
+          releaseBody: ""
+          releaseDraft: false
+          prerelease: false
 
       # Upload artifacts with platform-specific names
       - name: Upload artifacts
