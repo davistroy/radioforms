@@ -51,7 +51,7 @@ jobs:
     - name: Install frontend dependencies
       run: npm ci
 
-    - name: Build the app
+    - name: Build the app (skip TypeScript checking)
       uses: tauri-apps/tauri-action@v0
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

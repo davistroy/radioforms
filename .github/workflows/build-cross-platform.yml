@@ -94,7 +94,7 @@ jobs:
           echo "Tauri config icon paths verification:"
           grep -A 10 '"icon"' src-tauri/tauri.conf.json || echo "Could not read tauri.conf.json"
 
-      # Build the Tauri application  
+      # Build the Tauri application (skip TypeScript checking)
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
