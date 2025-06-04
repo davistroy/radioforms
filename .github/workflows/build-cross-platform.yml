@@ -77,9 +77,11 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
-      # Install frontend dependencies
+      # Install frontend dependencies with explicit timeout
       - name: Install frontend dependencies
-        run: npm ci
+        run: |
+          npm cache clean --force
+          npm install --no-fund --no-audit --timeout=300000
 
       # Debug icon files before build (cross-platform)
       - name: Debug icon files

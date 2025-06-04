@@ -49,7 +49,9 @@ jobs:
         workspaces: './src-tauri -> target'
 
     - name: Install frontend dependencies
-      run: npm ci
+      run: |
+        npm cache clean --force
+        npm install --no-fund --no-audit --timeout=300000
 
     - name: Build the app (skip TypeScript checking)
       uses: tauri-apps/tauri-action@v0
