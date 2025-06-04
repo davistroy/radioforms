@@ -11,17 +11,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Install WebView2 Runtime via Chocolatey
+      - name: Check WebView2 Runtime (usually pre-installed)
         run: |
-          echo "Installing WebView2 Runtime..."
-          choco install webview2 -y --timeout 300
-          echo "WebView2 installation completed"
-          
-      - name: Install Windows Build Tools
-        run: |
-          echo "Installing Windows build dependencies..."
-          choco install visualstudio2022buildtools -y --timeout 600
-          echo "Build tools installation completed"
+          echo "Checking for existing WebView2 installation..."
+          $webview2Path = "${env:ProgramFiles(x86)}\Microsoft\EdgeWebView\Application"
+          if (Test-Path $webview2Path) {
+            echo "✅ WebView2 is already installed at: $webview2Path"
+            Get-ChildItem $webview2Path
+          } else {
+            echo "⚠️ WebView2 not found, but Tauri will use Edge WebView2"
+            echo "GitHub Actions runners typically have Edge installed"
+          }
           
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -42,8 +42,8 @@ jobs:
           echo "Rust version: $(rustc --version)"
           npm run tauri build -- --verbose
         env:
-          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           
       - name: Upload Windows executable
         uses: actions/upload-artifact@v4
