@@ -1,55 +1,34 @@
 name: Build Windows
-on: 
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+on: workflow_dispatch
 jobs:
   build-windows:
-    runs-on: windows-latest
+    runs-on: windows-2019
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       
-      - name: Check WebView2 Runtime (usually pre-installed)
-        run: |
-          echo "Checking for existing WebView2 installation..."
-          $webview2Path = "${env:ProgramFiles(x86)}\Microsoft\EdgeWebView\Application"
-          if (Test-Path $webview2Path) {
-            echo "✅ WebView2 is already installed at: $webview2Path"
-            Get-ChildItem $webview2Path
-          } else {
-            echo "⚠️ WebView2 not found, but Tauri will use Edge WebView2"
-            echo "GitHub Actions runners typically have Edge installed"
-          }
-          
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
           
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
           
       - name: Install dependencies
-        run: npm install
+        run: npm ci
         
-      - name: Build Tauri app with verbose output
-        run: |
-          echo "Starting Tauri build..."
-          echo "Node version: $(node --version)"
-          echo "npm version: $(npm --version)"
-          echo "Rust version: $(rustc --version)"
-          npm run tauri build -- --verbose
+      - name: Build Tauri app
+        run: npm run tauri build
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          RUST_BACKTRACE: 1
           
       - name: Upload Windows executable
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: radioforms-windows-executable
-          path: |
-            src-tauri/target/release/radioforms.exe
-            src-tauri/target/release/bundle/msi/*.msi
+          name: radioforms-windows
+          path: src-tauri/target/release/radioforms.exe
