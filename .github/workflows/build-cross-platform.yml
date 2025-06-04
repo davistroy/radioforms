@@ -1,0 +1,126 @@
+name: Build Cross-Platform
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows builds
+          - platform: 'windows-2022' # Updated from deprecated windows-2019
+            args: ''
+            target: ''
+            
+          # macOS builds (both Intel and Apple Silicon)
+          - platform: 'macos-14' # Latest stable (was macos-latest)
+            args: '--target x86_64-apple-darwin'
+            target: 'x86_64-apple-darwin'
+            
+          - platform: 'macos-14'
+            args: '--target aarch64-apple-darwin'
+            target: 'aarch64-apple-darwin'
+            
+          # Linux build
+          - platform: 'ubuntu-24.04' # Latest stable (was ubuntu-latest)
+            args: ''
+            target: ''
+
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Install platform-specific dependencies
+      - name: Install dependencies (Ubuntu only)
+        if: matrix.platform == 'ubuntu-24.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev
+
+      # Setup Rust with proper targets
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      # Setup Node.js with caching
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # Rust dependency caching
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      # Install frontend dependencies
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # Build the Tauri application
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUST_BACKTRACE: 1
+        with:
+          args: ${{ matrix.args }}
+
+      # Upload artifacts with platform-specific names
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: radioforms-${{ matrix.platform }}-${{ matrix.target || 'default' }}
+          path: |
+            src-tauri/target/release/radioforms*
+            src-tauri/target/release/bundle/
+            src-tauri/target/${{ matrix.target }}/release/radioforms*
+            src-tauri/target/${{ matrix.target }}/release/bundle/
+          if-no-files-found: warn
+
+  # Release job (only on tags)
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: '**/*'
+          draft: true
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
