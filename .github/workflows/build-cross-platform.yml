@@ -82,6 +82,18 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # Debug icon files before build
+      - name: Debug icon files
+        run: |
+          echo "=== Icon file verification ==="
+          echo "Working directory: $(pwd)"
+          echo "src-tauri/icons directory contents:"
+          ls -la src-tauri/icons/ || echo "src-tauri/icons not found"
+          echo "Looking for icon.ico specifically:"
+          find . -name "icon.ico" -type f 2>/dev/null || echo "icon.ico not found anywhere"
+          echo "Tauri config icon paths verification:"
+          grep -A 10 '"icon"' src-tauri/tauri.conf.json || echo "Could not read tauri.conf.json"
+
       # Build the Tauri application  
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
