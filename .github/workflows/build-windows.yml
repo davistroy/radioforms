@@ -10,13 +10,34 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Install WebView2 Runtime
+        run: |
+          Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/p/?LinkId=2124703" -OutFile "MicrosoftEdgeWebview2Setup.exe"
+          Start-Process -FilePath "MicrosoftEdgeWebview2Setup.exe" -ArgumentList "/silent" -Wait
+          
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+          
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm install
-      - run: npm run tauri build
-      - uses: actions/upload-artifact@v4
+          
+      - name: Install dependencies
+        run: npm install
+        
+      - name: Build Tauri app with verbose output
+        run: npm run tauri build -- --verbose
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          
+      - name: Upload Windows executable
+        uses: actions/upload-artifact@v4
+        if: success()
         with:
-          name: windows-executable
-          path: src-tauri/target/release/radioforms.exe
+          name: radioforms-windows-executable
+          path: |
+            src-tauri/target/release/radioforms.exe
+            src-tauri/target/release/bundle/msi/*.msi
